@@ -14,6 +14,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Lambda2Js;
+using Raven.Client.Documents;
 using Raven.Client.Documents.Commands;
 using Raven.Client.Documents.Commands.Batches;
 using Raven.Client.Documents.Conventions;
@@ -110,7 +111,7 @@ namespace Raven.Client.Documents.Session
         /// Translate between an ID and its associated entity
         /// </summary>
         internal readonly Dictionary<string, DocumentInfo> IncludedDocumentsById = new Dictionary<string, DocumentInfo>(StringComparer.OrdinalIgnoreCase);
-
+        
         /// <summary>
         /// hold the data required to manage the data for RavenDB's Unit of Work
         /// </summary>
@@ -133,9 +134,12 @@ namespace Raven.Client.Documents.Session
             _timeSeriesByDocId ?? (_timeSeriesByDocId = new Dictionary<string, Dictionary<string, List<TimeSeriesRangeResult>>>(StringComparer.OrdinalIgnoreCase));
 
         private Dictionary<string, Dictionary<string, List<TimeSeriesRangeResult>>> _timeSeriesByDocId;
+        
 
         protected readonly DocumentStoreBase _documentStore;
 
+
+        
         public string DatabaseName { get; }
 
         ///<summary>
@@ -1574,6 +1578,17 @@ more responsive application.
             CountersByDocId[id] = cache;
         }
 
+        private void SetGotAllInCacheIfNeeded(IEnumerable<string> revisionsToInclude)
+        {
+            foreach (var cv in revisionsToInclude)
+            {
+                if (string.IsNullOrEmpty(cv) == false)
+                    continue;
+
+                SetGotAllCountersForDocument(cv);
+            }
+        }
+
         private void SetGotAllInCacheIfNeeded(Dictionary<string, string[]> countersToInclude)
         {
             foreach (var kvp in countersToInclude)
@@ -2073,11 +2088,50 @@ more responsive application.
             return JsonConverter.FromBlittable(entityType, ref document, id, trackEntity);
         }
 
+        // public bool CheckIfRevisionAlreadyIncluded(string[] cvs, KeyValuePair<string, Type>[] includes)
+        // {
+        //     if (includes == null) throw new ArgumentNullException(nameof(includes));
+        //     
+        //     return CheckIfRevisionAlreadyIncluded(cvs, includes.Select(x => x.Key));
+        // }
+        
+        // private bool CheckIfRevisionAlreadyIncluded(string[] cvs, IEnumerable<string> includes)
+        // {
+        //     foreach (var cv in cvs)
+        //     {
+        //         if (_knownMissingIds.Contains(id))
+        //             continue;
+        //
+        //         // Check if document was already loaded, the check if we've received it through include
+        //         if (DocumentsById.TryGetValue(id, out DocumentInfo documentInfo) == false &&
+        //             IncludedDocumentsById.TryGetValue(id, out documentInfo) == false)
+        //             return false;
+        //
+        //         if ((documentInfo.Entity == null) && (documentInfo.Document == null))
+        //             return false;
+        //
+        //         if (includes == null)
+        //             continue;
+        //
+        //         foreach (var include in includes)
+        //         {
+        //             var hasAll = true;
+        //             IncludesUtil.Include(documentInfo.Document, include, s => { hasAll &= IsLoaded(s); });
+        //
+        //             if (hasAll == false)
+        //                 return false;
+        //         }
+        //     }
+        //
+        //     return true;
+        // }
         public bool CheckIfIdAlreadyIncluded(string[] ids, KeyValuePair<string, Type>[] includes)
         {
             return CheckIfIdAlreadyIncluded(ids, includes.Select(x => x.Key));
         }
 
+
+        
         public bool CheckIfIdAlreadyIncluded(string[] ids, IEnumerable<string> includes)
         {
             foreach (var id in ids)
