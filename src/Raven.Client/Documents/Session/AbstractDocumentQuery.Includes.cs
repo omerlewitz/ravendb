@@ -14,6 +14,8 @@ namespace Raven.Client.Documents.Session
 
         protected List<CounterIncludesToken> CounterIncludesTokens;
 
+        internal List<RevisionIncludesToken> RevisionIncludesTokens;
+        
         internal List<CompareExchangeValueIncludesToken> CompareExchangeValueIncludesTokens;
 
         /// <summary>
@@ -58,6 +60,11 @@ namespace Raven.Client.Documents.Session
             {
                 IncludeTimeSeries(includes.Alias, includes.TimeSeriesToIncludeBySourceAlias);
             }
+            
+            if (includes.PathsForRevisionsInDocuments != null)
+            {
+                IncludeRevisions(includes.Alias, includes.PathsForRevisionsInDocuments);
+            }
 
             if (includes.CompareExchangeValuesToInclude != null)
             {
@@ -65,6 +72,20 @@ namespace Raven.Client.Documents.Session
 
                 foreach (var compareExchangeValue in includes.CompareExchangeValuesToInclude)
                     CompareExchangeValueIncludesTokens.Add(CompareExchangeValueIncludesToken.Create(compareExchangeValue));
+            }
+        }
+
+        private void IncludeRevisions(string includesAlias, HashSet<string> includesPathsForRevisionsInDocuments)
+        {
+            if (includesPathsForRevisionsInDocuments?.Count > 0 == false)
+                return;
+
+            RevisionIncludesTokens = new List<RevisionIncludesToken>();
+            _includesAlias ??= includesAlias;
+            
+            foreach(var path in includesPathsForRevisionsInDocuments)
+            {
+                RevisionIncludesTokens.Add(RevisionIncludesToken.Create(path));
             }
         }
 

@@ -622,6 +622,29 @@ namespace Raven.Server.Documents.Queries
                                                             $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
                                                             $" compare to '{split[0]}';. ");
                     }
+                    
+                    case ValueExpression {Value: ValueTokenType.String} ve:
+                    {
+                        var vt = QueryBuilder.GetValue(Query, this, parameters, ve);
+                        var split = vt.Value.ToString()?.Split('.');
+                        
+                        if(split.Length >= 2 && split[0] == Query.From.Alias?.Value)
+                        {
+                            var field = vt.Value.ToString()?.Substring(split[0].Length + 1);
+                            revisionIncludes.AddRevision(field);
+                            break;
+                        }
+                        
+                        if(split[0] == vt.Value.ToString())
+                        {
+                            revisionIncludes.AddRevision(vt.Value.ToString());
+                            break;
+                        }
+                        
+                        throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " + 
+                                                            $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
+                                                            $" compare to '{split[0]}';. ");
+                    }
                 }
             } 
         }

@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using FastTests;
 using FastTests.Utils;
 using Raven.Client;
+using Raven.Client.Documents;
 using Raven.Client.Exceptions;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,7 +16,54 @@ namespace SlowTests.Tests.Linq
         public CanQueryAndIncludeRevisions(ITestOutputHelper output) : base(output)
         {
         }
-        
+  
+        [Fact]
+        public async Task CanQueryAndIncludeRevisionsExtensionMethod()
+        {
+            using (var store = GetDocumentStore())
+            {
+                const string id = "users/omer";
+
+                await RevisionsHelper.SetupRevisions(Server.ServerStore, store.Database);
+
+                using (var session = store.OpenAsyncSession())
+                {
+                    await session.StoreAsync(new User {Name = "Omer",},
+                        id);
+
+                    await session.SaveChangesAsync();
+                }
+
+                string changeVector;
+                using (var session = store.OpenAsyncSession())
+                {
+                    var metadatas = await session.Advanced.Revisions.GetMetadataForAsync(id);
+                    Assert.Equal(1, metadatas.Count);
+
+                    changeVector = metadatas.First().GetString(Constants.Documents.Metadata.ChangeVector);
+
+                    session.Advanced.Patch<User, string>(id, x => x.ContractRevision, changeVector);
+                    await session.SaveChangesAsync();
+                }
+
+                using (var session = store.OpenAsyncSession())
+                {
+                    var query =  session.Query<User>()
+                        .Include(x => x.IncludeRevisions(x => x.ContractRevision));
+                   
+                    Assert.Equal("from 'Users' as x include revisions('ContractRevision')"
+                        , query.ToString());
+
+                    var queryResult = await query.ToListAsync();
+                    var revision = await session.Advanced.Revisions.GetAsync<User>(changeVector);
+
+                    Assert.NotNull(revision);
+                    Assert.Equal(1, session.Advanced.NumberOfRequests);
+                }
+            }
+        }
+
+
         [Fact]
         public async Task CanQueryAndIncludeRevisionsJint()
         {

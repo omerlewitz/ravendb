@@ -92,11 +92,15 @@ namespace Raven.Client.Documents.Session.Loaders
         IQueryIncludeBuilder<T> IncludeAllCounters(Expression<Func<T, string>> path);
 
         IQueryIncludeBuilder<T> IncludeTimeSeries(Expression<Func<T, string>> path, string name, DateTime from, DateTime to);
+
+        IQueryIncludeBuilder<T> IncludeRevisions(Expression<Func<T, string>> field);
     }
 
     public class IncludeBuilder
     {
         internal HashSet<string> DocumentsToInclude;
+        internal HashSet<string> PathsForRevisionsInDocuments;
+
 
         internal IEnumerable<AbstractTimeSeriesRange> TimeSeriesToInclude
         {
@@ -137,12 +141,14 @@ namespace Raven.Client.Documents.Session.Loaders
         }
 
         internal Dictionary<string, (bool AllCounters, HashSet<string> CountersToInclude)> CountersToIncludeBySourcePath;
+        
 
         internal Dictionary<string, HashSet<AbstractTimeSeriesRange>> TimeSeriesToIncludeBySourceAlias;
         internal HashSet<string> CompareExchangeValuesToInclude;
 
         internal bool IncludeTimeSeriesTags;
         internal bool IncludeTimeSeriesDocument;
+        
     }
 
     internal class IncludeBuilder<T> : IncludeBuilder, IQueryIncludeBuilder<T>, IIncludeBuilder<T>, ISubscriptionIncludeBuilder<T>, ITimeSeriesIncludeBuilder
@@ -333,6 +339,20 @@ namespace Raven.Client.Documents.Session.Loaders
             WithAlias(path);
             IncludeTimeSeriesFromTo(path.ToPropertyPath(), name, from, to);
             return this;
+        }
+
+        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisions(Expression<Func<T, string>> field)
+        {
+            WithAlias(field);
+            IncludeRevisionsTo(field: field.ToPropertyPath());
+            return this;
+        }
+
+        private void IncludeRevisionsTo(string field)
+        {
+            
+            PathsForRevisionsInDocuments ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            PathsForRevisionsInDocuments.Add(field);
         }
 
         IQueryIncludeBuilder<T> ICompareExchangeValueIncludeBuilder<T, IQueryIncludeBuilder<T>>.IncludeCompareExchangeValue(string path)
@@ -619,6 +639,7 @@ namespace Raven.Client.Documents.Session.Loaders
                 To = to?.EnsureUtc()
             });
         }
+        
 
         private void IncludeTimeSeriesByRangeTypeAndTime(string alias, string name, TimeSeriesRangeType type, TimeValue time)
         {

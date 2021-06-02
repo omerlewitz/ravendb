@@ -1234,6 +1234,7 @@ Use session.Query<T>() instead of session.Advanced.DocumentQuery<T>. The session
                 ExplanationToken == null &&
                 QueryTimings == null &&
                 CounterIncludesTokens == null &&
+                RevisionIncludesTokens == null &&
                 TimeSeriesIncludesTokens == null &&
                 CompareExchangeValueIncludesTokens == null)
                 return;
@@ -1254,6 +1255,7 @@ Use session.Query<T>() instead of session.Advanced.DocumentQuery<T>. The session
 
             WriteIncludeTokens(CounterIncludesTokens);
             WriteIncludeTokens(TimeSeriesIncludesTokens);
+            WriteIncludeTokens(RevisionIncludesTokens);
             WriteIncludeTokens(CompareExchangeValueIncludesTokens);
             WriteIncludeTokens(HighlightingTokens);
 

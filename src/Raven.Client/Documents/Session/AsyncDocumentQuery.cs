@@ -1129,7 +1129,8 @@ namespace Raven.Client.Documents.Session
                 Explanations = Explanations,
                 ExplanationToken = ExplanationToken,
                 IsIntersect = IsIntersect,
-                DefaultOperator = DefaultOperator
+                DefaultOperator = DefaultOperator,
+                RevisionIncludesTokens = RevisionIncludesTokens
             };
 
             return query;
