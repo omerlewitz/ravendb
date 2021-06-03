@@ -14,7 +14,7 @@ namespace Raven.Client.Documents.Session
 
         protected List<CounterIncludesToken> CounterIncludesTokens;
 
-        internal List<RevisionIncludesToken> RevisionIncludesTokens;
+        internal List<RevisionIncludesToken>  RevisionIncludesTokens;
         
         internal List<CompareExchangeValueIncludesToken> CompareExchangeValueIncludesTokens;
 
@@ -75,17 +75,17 @@ namespace Raven.Client.Documents.Session
             }
         }
 
-        private void IncludeRevisions(string includesAlias, HashSet<string> includesPathsForRevisionsInDocuments)
+        private void IncludeRevisions(string alias, Dictionary<string, HashSet<string>> includesPathsForRevisionsInDocuments)
         {
             if (includesPathsForRevisionsInDocuments?.Count > 0 == false)
                 return;
 
             RevisionIncludesTokens = new List<RevisionIncludesToken>();
-            _includesAlias ??= includesAlias;
-            
-            foreach(var path in includesPathsForRevisionsInDocuments)
+            _includesAlias ??= alias;
+
+            foreach (var path in includesPathsForRevisionsInDocuments)
             {
-                RevisionIncludesTokens.Add(RevisionIncludesToken.Create(path));
+             //   RevisionIncludesTokens.Add(RevisionIncludesToken.Create(alias,path));
             }
         }
 

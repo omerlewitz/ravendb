@@ -341,19 +341,14 @@ namespace Raven.Client.Documents.Session.Loaders
             return this;
         }
 
-        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisions(Expression<Func<T, string>> field)
+        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisions(Expression<Func<T, string>> path)
         {
-            WithAlias(field);
-            IncludeRevisionsTo(field: field.ToPropertyPath());
+            WithAlias(path);
+            IncludeRevisionsTo(path.ToPropertyPath());
             return this;
         }
 
-        private void IncludeRevisionsTo(string field)
-        {
-            
-            PathsForRevisionsInDocuments ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            PathsForRevisionsInDocuments.Add(field);
-        }
+    
 
         IQueryIncludeBuilder<T> ICompareExchangeValueIncludeBuilder<T, IQueryIncludeBuilder<T>>.IncludeCompareExchangeValue(string path)
         {
@@ -533,6 +528,11 @@ namespace Raven.Client.Documents.Session.Loaders
             CompareExchangeValuesToInclude.Add(path);
         }
 
+        private void IncludeRevisionsTo(string path)
+        {
+            PathsForRevisionsInDocuments ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            PathsForRevisionsInDocuments.Add(path);
+        }
         private void IncludeCounterWithAlias(Expression<Func<T, string>> path, string name)
         {
             WithAlias(path);

@@ -600,6 +600,7 @@ namespace Raven.Server.Documents.Queries
                         else revisionIncludes.AddRevision(fe.FieldValue);
                         break;
                     }
+                    
                     case ValueExpression {Value: ValueTokenType.Parameter} ve:
                     {
                         var vt = QueryBuilder.GetValue(Query, this, parameters, ve);
@@ -612,15 +613,12 @@ namespace Raven.Server.Documents.Queries
                             break;
                         }
 
-                        if(split[0] == vt.Value)
-                        {
-                            revisionIncludes.AddRevision(vt.Value.ToString());
-                            break;
-                        }
-                        
-                        throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " + 
-                                                            $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
-                                                            $" compare to '{split[0]}';. ");
+                        if (split[0] != vt.Value)
+                            throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " +
+                                                                $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
+                                                                $" compare to '{split[0]}';. ");
+                        revisionIncludes.AddRevision(vt.Value.ToString());
+                        break;
                     }
                     
                     case ValueExpression {Value: ValueTokenType.String} ve:
@@ -634,16 +632,13 @@ namespace Raven.Server.Documents.Queries
                             revisionIncludes.AddRevision(field);
                             break;
                         }
-                        
-                        if(split[0] == vt.Value.ToString())
-                        {
-                            revisionIncludes.AddRevision(vt.Value.ToString());
-                            break;
-                        }
-                        
-                        throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " + 
-                                                            $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
-                                                            $" compare to '{split[0]}';. ");
+
+                        if (split[0] != vt.Value.ToString())
+                            throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " +
+                                                                $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
+                                                                $" compare to '{split[0]}';. ");
+                        revisionIncludes.AddRevision(vt.Value.ToString());
+                        break;
                     }
                 }
             } 

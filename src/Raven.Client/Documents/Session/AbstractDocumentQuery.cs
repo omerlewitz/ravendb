@@ -1827,6 +1827,14 @@ Use session.Query<T>() instead of session.Advanced.DocumentQuery<T>. The session
                     token.AddAliasToPath(fromAlias);
                 }
             }
+            
+            if (RevisionIncludesTokens != null)
+            {
+                foreach (var token in RevisionIncludesTokens)
+                {
+                    token.AddAliasToPath(fromAlias);
+                }
+            }
 
             return fromAlias;
         }
