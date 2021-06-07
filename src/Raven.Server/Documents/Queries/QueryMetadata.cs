@@ -43,9 +43,12 @@ namespace Raven.Server.Documents.Queries
 
         private readonly Dictionary<string, QueryFieldName> _aliasToName = new Dictionary<string, QueryFieldName>();
 
-        public readonly Dictionary<StringSegment, (string PropertyPath, bool Array, bool Parameter, bool Quoted, string LoadFromAlias)> RootAliasPaths = new Dictionary<StringSegment, (string, bool, bool, bool, string)>();
+        public readonly Dictionary<StringSegment, (string PropertyPath, bool Array, bool Parameter, bool Quoted, string LoadFromAlias)> RootAliasPaths =
+            new Dictionary<StringSegment, (string, bool, bool, bool, string)>();
 
-        public QueryMetadata(string query, BlittableJsonReaderObject parameters, ulong cacheKey, bool addSpatialProperties = false, QueryType queryType = QueryType.Select, DocumentDatabase database = null)
+        public QueryMetadata(
+            string query, BlittableJsonReaderObject parameters, ulong cacheKey, bool addSpatialProperties = false, QueryType queryType = QueryType.Select,
+            DocumentDatabase database = null)
             : this(ParseQuery(query, queryType, database), parameters, cacheKey, addSpatialProperties)
         {
         }
@@ -165,7 +168,7 @@ namespace Raven.Server.Documents.Queries
         public ExplanationField Explanation;
 
         public CounterIncludesField CounterIncludes;
-        
+
         public RevisionIncludeField RevisionIncludes;
 
         public TimeSeriesIncludesField TimeSeriesIncludes;
@@ -198,7 +201,8 @@ namespace Raven.Server.Documents.Queries
             IsCollectionQuery = false;
         }
 
-        public void AddWhereField(QueryFieldName fieldName,
+        public void AddWhereField(
+            QueryFieldName fieldName,
             BlittableJsonReaderObject parameters,
             bool search = false,
             bool exact = false,
@@ -206,7 +210,7 @@ namespace Raven.Server.Documents.Queries
             OperatorType? operatorType = null,
             bool isNegated = false,
             string methodName = null
-            )
+        )
         {
             QueryFieldName indexFieldName;
 
@@ -221,6 +225,7 @@ namespace Raven.Server.Documents.Queries
                 {
                     ThrowUnknownAlias(split[0], parameters);
                 }
+
                 indexFieldName = GetIndexFieldName(fieldName, parameters);
             }
 
@@ -292,10 +297,12 @@ namespace Raven.Server.Documents.Queries
                         RootAliasPaths.TryAdd(alias, (null, false, false, false, null));
                     }
                 }
+
                 foreach (var edge in edgePredicateKeys)
                 {
                     RootAliasPaths.TryAdd(edge.Key, (null, false, false, false, null));
                 }
+
                 foreach (var doc in documentQueryKeys)
                 {
                     RootAliasPaths.TryAdd(doc.Key, (null, false, false, false, null));
@@ -368,7 +375,8 @@ namespace Raven.Server.Documents.Queries
 
         private static void ThrowOnUndefinedAlias(StringSegment alias)
         {
-            throw new InvalidQueryException($"Could not find alias '{alias}' defined the query. SELECT clause must include an alias that refers to either a vertex or an edge");
+            throw new InvalidQueryException(
+                $"Could not find alias '{alias}' defined the query. SELECT clause must include an alias that refers to either a vertex or an edge");
         }
 
         private static void ThrowMissingVertexMatchClauses()
@@ -550,21 +558,22 @@ namespace Raven.Server.Documents.Queries
 
                                 AddInclude(include, fieldName.Value, ref compareExchangeValueIncludes);
                                 break;
-                            
-                            case MethodType.Revisions: 
-                                 QueryValidator.ValidateRevisions(me.Arguments, QueryText, parameters);
-                                
+
+                            case MethodType.Revisions:
+                                QueryValidator.ValidateRevisions(me.Arguments, QueryText, parameters);
+
                                 RevisionIncludes ??= new RevisionIncludeField();
-                                
+
                                 HasIncludeOrLoad = true;
-                                
+
                                 AddToRevisionsInclude(RevisionIncludes, me, parameters);
-                                
+
                                 break;
 
                             default:
                                 throw new InvalidQueryException($"Unable to figure out how to deal with include method '{methodType}'", QueryText, parameters);
                         }
+
                         break;
 
                     default:
@@ -584,66 +593,96 @@ namespace Raven.Server.Documents.Queries
 
         private void AddToRevisionsInclude(RevisionIncludeField revisionIncludes, MethodExpression expression, BlittableJsonReaderObject parameters)
         {
-            foreach (var queryExpression in expression.Arguments)
+            var numberOfArguments = expression.Arguments?.Count;
+
+            switch (numberOfArguments)
             {
-                switch (queryExpression)
+                case 1:
                 {
-                    case FieldExpression fe:
+                    foreach (var queryExpression in expression.Arguments)
                     {
-                        if (Query.From.Alias?.Value.Equals(fe.Compound[0].Value) == false)
-                            throw new InvalidOperationException($"Cannot include revisions for related Expression '{fe}', " + 
-                                                                $"Parent alias is different than include alias '{Query.From.Alias?.Value}'" +
-                                                                $" compare to '{fe.Compound[0].Value}';. ");
-                      
-                        if(string.IsNullOrEmpty(fe.FieldValueWithoutAlias) == false)
-                           revisionIncludes.AddRevision(fe.FieldValueWithoutAlias);
-                        else revisionIncludes.AddRevision(fe.FieldValue);
-                        break;
-                    }
-                    
-                    case ValueExpression {Value: ValueTokenType.Parameter} ve:
-                    {
-                        var vt = QueryBuilder.GetValue(Query, this, parameters, ve);
-                        var split = vt.Value.ToString()?.Split('.');
-                        
-                        if(split.Length >= 2 && split[0] == Query.From.Alias?.Value)
+                        switch (queryExpression)
                         {
-                            var field = vt.Value.ToString()?.Substring(split[0].Length + 1);
-                            revisionIncludes.AddRevision(field);
-                            break;
-                        }
+                            case FieldExpression fe:
+                            {
+                                if (Query.From.Alias?.Value.Equals(fe.Compound[0].Value) == false)
+                                    throw new InvalidOperationException($"Cannot include revisions for related Expression '{fe}', " +
+                                                                        $"Parent alias is different than include alias '{Query.From.Alias?.Value}'" +
+                                                                        $" compare to '{fe.Compound[0].Value}';. ");
 
-                        if (split[0] != vt.Value)
-                            throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " +
-                                                                $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
-                                                                $" compare to '{split[0]}';. ");
-                        revisionIncludes.AddRevision(vt.Value.ToString());
-                        break;
-                    }
-                    
-                    case ValueExpression {Value: ValueTokenType.String} ve:
-                    {
-                        var vt = QueryBuilder.GetValue(Query, this, parameters, ve);
-                        var split = vt.Value.ToString()?.Split('.');
-                        
-                        if(split.Length >= 2 && split[0] == Query.From.Alias?.Value)
-                        {
-                            var field = vt.Value.ToString()?.Substring(split[0].Length + 1);
-                            revisionIncludes.AddRevision(field);
-                            break;
-                        }
+                                if (string.IsNullOrEmpty(fe.FieldValueWithoutAlias) == false)
+                                    revisionIncludes.AddRevision(fe.FieldValueWithoutAlias);
+                                else
+                                    revisionIncludes.AddRevision(fe.FieldValue);
+                                break;
+                            }
 
-                        if (split[0] != vt.Value.ToString())
-                            throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " +
-                                                                $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
-                                                                $" compare to '{split[0]}';. ");
-                        revisionIncludes.AddRevision(vt.Value.ToString());
-                        break;
+                            case ValueExpression {Value: ValueTokenType.Parameter} ve:
+                            {
+                                var vt = QueryBuilder.GetValue(Query,
+                                    this,
+                                    parameters,
+                                    ve);
+
+                                var split = vt.Value.ToString()?.Split('.');
+
+                                if (split.Length >= 2 && split[0] == Query.From.Alias?.Value)
+                                {
+                                    var field = vt.Value.ToString()?.Substring(split[0].Length + 1);
+                                    revisionIncludes.AddRevision(field);
+                                    break;
+                                }
+
+                                if (vt.Value is DateTime)
+                                {
+                                    revisionIncludes.AddRevision(vt.Value.ToString());
+
+                                }
+
+                                if (split[0] != vt.Value)
+                                    throw new InvalidOperationException($"Cannot include revisions for related Expression '{vt}', " +
+                                                                        $"Parent alias is different than include alias '{Query.From.Alias.Value}'" +
+                                                                        $" compare to '{split[0]}';. ");
+                                revisionIncludes.AddRevision(vt.Value.ToString());
+                                break;
+                            }
+                            
+                            case ValueExpression {Value: ValueTokenType.String} ve:
+                            {
+                                var valueType = QueryBuilder.GetValue(Query, this, parameters, ve);
+                             
+                                if(string.IsNullOrEmpty(valueType.Value.ToString()))
+                                    return;
+                                
+                                var dateTime = DateTimeOffset.Parse(
+                                    valueType.Value.ToString() ?? 
+                                    throw new InvalidOperationException($"Could not parse Revision({valueType.Value}"))
+                                    .UtcDateTime;
+                                
+                                revisionIncludes.AddRevision(dateTime);
+                                break;
+                            }
+
+                        }
                     }
                 }
-            } 
+                    break;
+                
+                case 3:
+                {
+                    var relatedDocumentPath = ((ValueExpression)expression.Arguments[0]).GetValue(parameters);
+                    var start = ((ValueExpression)expression.Arguments[1]).GetValue(parameters);
+                    var take  = ((ValueExpression) expression.Arguments[2]).GetValue(parameters);
+                    
+                    revisionIncludes.AddRevision(relatedDocumentPath.ToString(), (long)start, (long)take);
+                }
+                    break;
+                default:
+                    return;
+            }
+
         }
-        
+
         private static ExplanationField CreateExplanationField(MethodExpression expression)
             {
             var result = new ExplanationField();

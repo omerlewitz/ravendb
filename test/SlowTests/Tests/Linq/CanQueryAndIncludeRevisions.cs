@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FastTests;
@@ -6,6 +7,7 @@ using FastTests.Utils;
 using Raven.Client;
 using Raven.Client.Documents;
 using Raven.Client.Exceptions;
+using Sparrow.Extensions;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -62,9 +64,9 @@ namespace SlowTests.Tests.Linq
                 
             }
         }
-
+        
         [Fact]
-        public async Task CanQueryAndIncludeSeveralRevisionsExtensionMethod()
+        public async Task CanQueryAndIncludeRevisionsExtensionMethodBeforeDateTime()
         {
             using (var store = GetDocumentStore())
             {
@@ -76,69 +78,79 @@ namespace SlowTests.Tests.Linq
 
                 using (var session = store.OpenAsyncSession())
                 {
-                    await session.StoreAsync(new User {Name = "Omer",}, id);
-                    await session.StoreAsync(new User {Name = "Rhinos",RelatedDocument = "users/omer"}, id2);
+                    await session.StoreAsync(new User
+                    {
+                        Name = "Omer"
+                    }, id);
+                    
+                    await session.StoreAsync(new User
+                    {
+                        Name = "Rhinos",
+                    }, id2);
 
                     await session.SaveChangesAsync();
                 }
-
-                string changeVector;
                 using (var session = store.OpenAsyncSession())
                 {
-                    var metadatas = await session.Advanced.Revisions.GetMetadataForAsync(id);
-                    Assert.Equal(1, metadatas.Count);
-                      
-                    changeVector = metadatas.First().GetString(Constants.Documents.Metadata.ChangeVector);
+                    var dateTime = DateTime.UtcNow;
+                    var query = session.Query<User>().Include(u => u.IncludeRevisionsBefore(dateTime));
                     
-                    session.Advanced.Patch<User, string>(id, x => x.FirstRevision, changeVector);
-                    
-                    await session.SaveChangesAsync();
+                    Assert.Equal($"from 'Users' include revisions('{dateTime.GetDefaultRavenFormat()}')", query.ToString());
 
-                    cvList.Add(changeVector);
+                    var queryResult = await query.ToListAsync();
                     
-                    metadatas = await session.Advanced.Revisions.GetMetadataForAsync(id);
-                    
-                    changeVector =  metadatas[0].GetString(Constants.Documents.Metadata.ChangeVector);
-                    
-                    cvList.Add(changeVector);
-                    
-                    session.Advanced.Patch<User, string>(id, x => x.SecondRevision, changeVector);
-                    
-                    await session.SaveChangesAsync(); 
-                    
-                    metadatas = await session.Advanced.Revisions.GetMetadataForAsync(id);
+                    Assert.NotNull(queryResult);
+                }
+                
+            }
+        }
 
-                    changeVector = metadatas[0].GetString(Constants.Documents.Metadata.ChangeVector);
+
+        [Fact]
+        public async Task CanQueryAndIncludeSeveralRevisionsExtensionMethod()
+        {
+            using (var store = GetDocumentStore())
+            {
+                const string id = "users/omer";
+                const string id2 = "users/rhino";
+                
+                await RevisionsHelper.SetupRevisions(Server.ServerStore, store.Database);
+
+                using (var session = store.OpenAsyncSession())
+                {
+                    await session.StoreAsync(new User
+                    {
+                        Name = "Omer",
+                        RelatedDocument = "users/rhino",
+                        RelatedDocument2 = "users/rhino"
+                    }, id);
                     
-                    cvList.Add(changeVector);
+                    await session.StoreAsync(new User
+                    {
+                        Name = "Rhinos"
+                    }, id2);
                     
-                    session.Advanced.Patch<User, string>(id, x => x.ThirdRevision, changeVector);
-                    
+
                     await session.SaveChangesAsync();
                 }
-
                 using (var session = store.OpenAsyncSession())
                 {
-                    // var t = session.Query<User>()
-                    //     .Include(u => u.Name)
-                    //     .Include(y => y.SecondRevision).ToString();
+                    // var metadatas = await session.Advanced.Revisions.GetMetadataForAsync(id2);
+                    // var  changeVector = metadatas.First().GetString(Constants.Documents.Metadata.ChangeVector);
                     
                     var query = session.Query<User>()
                             .Include(u => u
                             .IncludeRevisions(x => x.RelatedDocument)
-                            .IncludeRevisions(y => y.SecondRevision)
-                            .IncludeRevisions(u => u.ThirdRevision));
-                    
-                    Assert.Equal("from 'Users' as u include revisions(u.Company,y.)", query.ToString());
+                            .IncludeRevisions(y => y.RelatedDocument2));
 
-                    //var queryResult = await query.ToListAsync();
-                    var revision1 = await session.Advanced.Revisions.GetAsync<User>(cvList[0]);
-                    var revision2 = await session.Advanced.Revisions.GetAsync<User>(cvList[1]);
-                    var revision3 = await session.Advanced.Revisions.GetAsync<User>(cvList[2]);
+                   //Assert.Equal("from 'Users' as x include revisions('RelatedDocument',0,25), revisions(x.RelatedDocument2)", query.ToString());
+
+                   var queryResult = await query.ToListAsync();
+                   
+                    var revision1 = await session.Advanced.Revisions.GetForAsync<User>(id2);
+                    var revision2 = await session.Advanced.Revisions.GetForAsync<User>(id2);
 
                     Assert.NotNull(revision1);
-                    Assert.NotNull(revision2);
-                    Assert.NotNull(revision3);
                     
                     Assert.Equal(1, session.Advanced.NumberOfRequests);
                 }
@@ -856,7 +868,8 @@ select Foo(u)"
             public string FirstRevision { get; set; }
             public string SecondRevision { get; set; }
             public string ThirdRevision { get; set; }
-            public List<string> ChangeVectors { get; set; } 
+            public List<string> ChangeVectors { get; set; }
+            public string RelatedDocument2 { get; set; }
         }
     }
 }

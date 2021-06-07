@@ -135,7 +135,7 @@ namespace Raven.Server.Documents.Queries.Dynamic
 
                 var fieldsToFetch = new FieldsToFetch(query, null);
                 var includeDocumentsCommand  = new IncludeDocumentsCommand(Database.DocumentsStorage, context.Documents, query.Metadata.Includes, fieldsToFetch.IsProjection);
-                var includeRevisionsCommand  = new IncludeRevisionsCommand(Database, context.Documents, query.Metadata.RevisionIncludes?.Revisions);
+                var includeRevisionsCommand  = new IncludeRevisionsCommand(Database, context.Documents, query.Metadata.RevisionIncludes?.RevisionsChangeVectorSet, query.Metadata.RevisionIncludes?.RevisionsWithPaging, query.Metadata.RevisionIncludes?.RevisionWithDateTime);
                 
                 var includeCompareExchangeValuesCommand = IncludeCompareExchangeValuesCommand.ExternalScope(context, query.Metadata.CompareExchangeValueIncludes);
 
@@ -171,12 +171,29 @@ namespace Raven.Server.Documents.Queries.Dynamic
                 IncludeCountersCommand   includeCountersCommand   = null;
                 IncludeTimeSeriesCommand includeTimeSeriesCommand = null;
                 
-                if (query.Metadata.RevisionIncludes != null)
+                if (query.Metadata.RevisionIncludes?.RevisionsChangeVectorSet != null)
                 {
                     includeRevisionsCommand = new IncludeRevisionsCommand(
                         Database,
                         context.Documents,
-                        query.Metadata.RevisionIncludes.Revisions);
+                        query.Metadata.RevisionIncludes.RevisionsChangeVectorSet);
+                }
+                
+                if (query.Metadata.RevisionIncludes?.RevisionsWithPaging != null)
+                {
+                    includeRevisionsCommand = new IncludeRevisionsCommand(
+                        Database,
+                        context.Documents,
+                        query.Metadata.RevisionIncludes.RevisionsWithPaging);
+                }
+
+                
+                if (query.Metadata.RevisionIncludes?.RevisionWithDateTime != null)
+                {
+                    includeRevisionsCommand = new IncludeRevisionsCommand(
+                        Database,
+                        context.Documents,
+                        query.Metadata.RevisionIncludes?.RevisionWithDateTime);
                 }
                 
                 if (query.Metadata.CounterIncludes != null)

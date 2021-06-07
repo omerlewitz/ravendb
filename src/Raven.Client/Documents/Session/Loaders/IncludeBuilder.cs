@@ -93,13 +93,19 @@ namespace Raven.Client.Documents.Session.Loaders
 
         IQueryIncludeBuilder<T> IncludeTimeSeries(Expression<Func<T, string>> path, string name, DateTime from, DateTime to);
 
-        IQueryIncludeBuilder<T> IncludeRevisions(Expression<Func<T, string>> field);
+        IQueryIncludeBuilder<T> IncludeRevisionsByChangeVector(Expression<Func<T, string>> field);
+        
+        IQueryIncludeBuilder<T> IncludeRevisions(Expression<Func<T, string>> path, long start = 0, long pageSize = 25);
+
+        IQueryIncludeBuilder<T> IncludeRevisionsBefore(DateTime dateTime);
     }
 
     public class IncludeBuilder
     {
         internal HashSet<string> DocumentsToInclude;
-        internal HashSet<string> PathsForRevisionsInDocuments;
+        internal DateTime? RevisionDateTimeToInclude;
+        internal Dictionary<string, (long start, long take)> RevisionsPathWithPagingInDocument;
+        
 
 
         internal IEnumerable<AbstractTimeSeriesRange> TimeSeriesToInclude
@@ -340,16 +346,27 @@ namespace Raven.Client.Documents.Session.Loaders
             IncludeTimeSeriesFromTo(path.ToPropertyPath(), name, from, to);
             return this;
         }
-
-        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisions(Expression<Func<T, string>> path)
+        //TODO:implementation
+        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisionsByChangeVector(Expression<Func<T, string>> path)
         {
             WithAlias(path);
-            IncludeRevisionsTo(path.ToPropertyPath());
+         //   IncludeRevisionsTo(path.ToPropertyPath(), start, pageSize);
             return this;
         }
-
-    
-
+        
+        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisions(Expression<Func<T, string>> path, long start, long pageSize)
+        {
+            WithAlias(path);
+            IncludeRevisionsRelatedDocument(path.ToPropertyPath(), start, pageSize);
+            return this;
+        }
+        
+        IQueryIncludeBuilder<T> IQueryIncludeBuilder<T>.IncludeRevisionsBefore(DateTime dateTime)
+        {
+            IncludeRevisionsBeforeDateTime(dateTime);
+            return this;
+        }
+        
         IQueryIncludeBuilder<T> ICompareExchangeValueIncludeBuilder<T, IQueryIncludeBuilder<T>>.IncludeCompareExchangeValue(string path)
         {
             IncludeCompareExchangeValue(path);
@@ -528,10 +545,15 @@ namespace Raven.Client.Documents.Session.Loaders
             CompareExchangeValuesToInclude.Add(path);
         }
 
-        private void IncludeRevisionsTo(string path)
+        private void IncludeRevisionsBeforeDateTime(DateTime dateTime)
         {
-            PathsForRevisionsInDocuments ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            PathsForRevisionsInDocuments.Add(path);
+            RevisionDateTimeToInclude = dateTime;
+        }
+        
+        private void IncludeRevisionsRelatedDocument(string path, long start, long take)
+        {
+            RevisionsPathWithPagingInDocument ??= new Dictionary<string, (long start, long take)>(StringComparer.OrdinalIgnoreCase);
+            RevisionsPathWithPagingInDocument.Add(path, (start, take));
         }
         private void IncludeCounterWithAlias(Expression<Func<T, string>> path, string name)
         {

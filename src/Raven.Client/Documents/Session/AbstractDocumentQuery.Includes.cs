@@ -61,9 +61,14 @@ namespace Raven.Client.Documents.Session
                 IncludeTimeSeries(includes.Alias, includes.TimeSeriesToIncludeBySourceAlias);
             }
             
-            if (includes.PathsForRevisionsInDocuments != null)
+            if (includes.RevisionsPathWithPagingInDocument != null)
             {
-                IncludeRevisions(includes.Alias, includes.PathsForRevisionsInDocuments);
+                IncludeRevisions(includes.Alias, includes.RevisionsPathWithPagingInDocument);
+            }
+            
+            if (includes.RevisionDateTimeToInclude != null)
+            {
+                IncludeRevisions(includes.Alias, includes.RevisionDateTimeToInclude);
             }
 
             if (includes.CompareExchangeValuesToInclude != null)
@@ -75,17 +80,25 @@ namespace Raven.Client.Documents.Session
             }
         }
 
-        private void IncludeRevisions(string alias, Dictionary<string, HashSet<string>> includesPathsForRevisionsInDocuments)
+        private void IncludeRevisions(string alias, DateTime? dateTime)
+        {
+
+            RevisionIncludesTokens = new List<RevisionIncludesToken>();
+            _includesAlias ??= alias;
+            RevisionIncludesTokens.Add(RevisionIncludesToken.Create(alias, dateTime.Value));
+        }
+        
+        private void IncludeRevisions(string alias, Dictionary<string, (long start, long take)> includesPathsForRevisionsInDocuments)
         {
             if (includesPathsForRevisionsInDocuments?.Count > 0 == false)
                 return;
 
             RevisionIncludesTokens = new List<RevisionIncludesToken>();
             _includesAlias ??= alias;
-
-            foreach (var path in includesPathsForRevisionsInDocuments)
+            
+            foreach (var kvp in includesPathsForRevisionsInDocuments)
             {
-             //   RevisionIncludesTokens.Add(RevisionIncludesToken.Create(alias,path));
+                RevisionIncludesTokens.Add(RevisionIncludesToken.Create(alias, kvp.Key, kvp.Value));
             }
         }
 
@@ -93,7 +106,7 @@ namespace Raven.Client.Documents.Session
         {
             if (countersToIncludeByDocId?.Count > 0 == false)
                 return;
-
+  
             CounterIncludesTokens = new List<CounterIncludesToken>();
             _includesAlias = alias;
 

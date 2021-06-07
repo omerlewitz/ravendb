@@ -13,7 +13,7 @@ namespace Raven.Client.Documents.Commands
     {
         internal readonly string _changeVector;
         public readonly string[] ChangeVectors;
-        private readonly string _id;
+        public readonly string _id;
         private readonly int? _start;
         private readonly int? _pageSize;
         private readonly bool _metadataOnly;
