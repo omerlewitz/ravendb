@@ -21,6 +21,7 @@ using Raven.Client.Util;
 using Raven.Debug.StackTrace;
 using Raven.Server;
 using Raven.Server.Commercial;
+using Raven.Server.Commercial.LetsEncrypt;
 using Raven.Server.Config;
 using Raven.Server.Config.Categories;
 using Raven.Server.Config.Settings;
@@ -277,7 +278,7 @@ namespace FastTests
                 {
                     CertificateUtils.CreateSelfSignedClientCertificate(
                         name,
-                        new LetsEncryptUtils.CertificateHolder
+                        new CertificateUtils.CertificateHolder
                         {
                             Certificate = serverCertificate,
                             PrivateKey = pk
