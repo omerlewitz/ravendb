@@ -31,7 +31,10 @@ namespace Raven.Server.Commercial.LetsEncrypt
             {
                 await RavenDnsRecordHelper.UpdateDnsRecordsTask(new RavenDnsRecordHelper.UpdateDnsRecordParameters
                 {
-                    Challenge = challengeResult.Challenge, SetupInfo = setupInfo, Token = CancellationToken.None
+                    Challenge = challengeResult.Challenge,
+                    SetupInfo = setupInfo,
+                    Progress = setupProgressAndResult,
+                    Token = CancellationToken.None
                 });
                 setupProgressAndResult.AddInfo($"Updating DNS record(s) and challenge(s) in {setupInfo.Domain.ToLower()}.{setupInfo.RootDomain.ToLower()}.");
             }
@@ -65,7 +68,7 @@ namespace Raven.Server.Commercial.LetsEncrypt
             {
                 var zipFile = await ZipFileHelper.CompleteClusterConfigurationAndGetSettingsZip(new ZipFileHelper.CompleteClusterConfigurationParameters
                 {
-                    Progress = null,
+                    Progress = setupProgressAndResult,
                     OnProgress = null,
                     SetupInfo = setupInfo,
                     SetupMode = SetupMode.None,
@@ -99,7 +102,7 @@ namespace Raven.Server.Commercial.LetsEncrypt
                 {
                      zipFile = await ZipFileHelper.CompleteClusterConfigurationAndGetSettingsZip(new ZipFileHelper.CompleteClusterConfigurationParameters
                     {
-                        Progress = null,
+                        Progress = setupProgressAndResult,
                         OnProgress = null,
                         SetupInfo = setupInfo,
                         SetupMode = SetupMode.None,

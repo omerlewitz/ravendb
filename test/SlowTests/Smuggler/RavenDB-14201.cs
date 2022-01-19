@@ -7,7 +7,6 @@ using Raven.Client.Documents.Operations;
 using Raven.Client.Exceptions;
 using Raven.Client.ServerWide;
 using Raven.Client.ServerWide.Operations.Migration;
-using Raven.Server.Config.Settings;
 using Xunit;
 using Xunit.Abstractions;
 

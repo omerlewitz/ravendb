@@ -2,7 +2,7 @@
   "profiles": {
     "rvn": {
       "commandName": "Project",
-      "commandLineArgs": "create-setup-package --setup-parameters=\"D:\\tf\\settings.json\""
+      "commandLineArgs": "create-setup-package --mode=\"lets-encrypt\" --package-output-file=\"omeriko\" --setup-parameters=\"D:\\tf\\settings.json\""
     }
   }
 }

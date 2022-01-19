@@ -62,14 +62,7 @@ public static class ZipFileHelper
                 using (var context = new JsonOperationContext(1024, 1024 * 4, 32 * 1024, SharedMultipleUseFlag.None))
                 {
                     parameters.Progress?.AddInfo("Loading and validating server certificate.");
-                    if (parameters.Progress != null)
-                    {
-                        parameters.OnProgress(parameters.Progress);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Loading and validating server certificate.");
-                    }
+                    parameters.OnProgress?.Invoke(parameters.Progress);
 
                     byte[] serverCertBytes;
                     X509Certificate2 serverCert;
@@ -92,18 +85,16 @@ public static class ZipFileHelper
                         if (parameters.OnBeforeAddingNodesToCluster != null)
                             await parameters.OnBeforeAddingNodesToCluster(publicServerUrl, localNodeTag);
 
+                        serverCertificateHolder = SecretProtection.ValidateCertificateAndCreateCertificateHolder("Setup", serverCert, serverCertBytes,
+                            parameters.SetupInfo.Password, parameters.LicenseType, parameters.CertificateValidationKeyUsages);
+                        
                         foreach (var node in parameters.SetupInfo.NodeSetupInfos)
                         {
                             if (node.Key == parameters.SetupInfo.LocalNodeTag)
                                 continue;
 
-                            if (parameters.Progress != null)
-                                parameters.Progress.AddInfo($"Adding node '{node.Key}' to the cluster.");
-                            else
-                                Console.WriteLine($"Adding node '{node.Key}' to the cluster.");
-
+                            parameters.Progress?.AddInfo($"Adding node '{node.Key}' to the cluster.");
                             parameters.OnProgress?.Invoke(parameters.Progress);
-
 
                             parameters.SetupInfo.NodeSetupInfos[node.Key].PublicServerUrl = LetsEncryptCertificateUtil.GetServerUrlFromCertificate(serverCert,
                                 parameters.SetupInfo, node.Key,
@@ -113,20 +104,13 @@ public static class ZipFileHelper
                             if (parameters.AddNodeToCluster != null)
                                 await parameters.AddNodeToCluster(node.Key);
                         }
-
-                        serverCertificateHolder = SecretProtection.ValidateCertificateAndCreateCertificateHolder("Setup", serverCert, serverCertBytes,
-                            parameters.SetupInfo.Password, parameters.LicenseType, parameters.CertificateValidationKeyUsages);
                     }
                     catch (Exception e)
                     {
                         throw new InvalidOperationException("Could not load the certificate in the local server.", e);
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress.AddInfo("Generating the client certificate.");
-                    else
-                        Console.WriteLine($"Generating the client certificate.");
-
+                    parameters.Progress.AddInfo("Generating the client certificate.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     X509Certificate2 clientCert;
@@ -158,11 +142,7 @@ public static class ZipFileHelper
                     if (parameters.RegisterClientCert != null)
                         await parameters.RegisterClientCertInOs(parameters.OnProgress, parameters.Progress, clientCert);
 
-                    if (parameters.Progress != null)
-                        parameters.Progress?.AddInfo("Writing certificates to zip archive.");
-                    else
-                        Console.WriteLine("Writing certificates to zip archive.");
-
+                    parameters.Progress?.AddInfo("Writing certificates to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     try
@@ -267,11 +247,7 @@ public static class ZipFileHelper
                         var currentNodeSettingsJson = settingsJson.Clone(context);
                         currentNodeSettingsJson.Modifications ??= new DynamicJsonValue(currentNodeSettingsJson);
 
-                        if (parameters.Progress != null)
-                            parameters.Progress?.AddInfo($"Creating settings file 'settings.json' for node {node.Key}.");
-                        else
-                            Console.WriteLine($"Creating settings file 'settings.json' for node {node.Key}.");
-
+                        parameters.Progress?.AddInfo($"Creating settings file 'settings.json' for node {node.Key}.");
                         parameters.OnProgress?.Invoke(parameters.Progress);
 
                         if (node.Value.Addresses.Count != 0)
@@ -316,11 +292,7 @@ public static class ZipFileHelper
                             }
                         }
 
-                        if (parameters.Progress != null)
-                            parameters.Progress?.AddInfo($"Adding settings file for node '{node.Key}' to zip archive.");
-                        else
-                            Console.WriteLine($"Adding settings file for node '{node.Key}' to zip archive.");
-
+                        parameters.Progress?.AddInfo($"Adding settings file for node '{node.Key}' to zip archive.");
                         parameters.OnProgress?.Invoke(parameters.Progress);
 
                         try
@@ -351,20 +323,13 @@ public static class ZipFileHelper
                         }
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress?.AddInfo("Adding readme file to zip archive.");
-                    else
-                        Console.WriteLine("Adding readme file to zip archive.");
-
+                    parameters.Progress?.AddInfo("Adding readme file to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     string readmeString = CreateReadmeText(parameters.SetupInfo.LocalNodeTag, publicServerUrl, parameters.SetupInfo.NodeSetupInfos.Count > 1,
                         parameters.SetupInfo.RegisterClientCert);
 
-                    if (parameters.Progress != null)
-                        parameters.Progress.Readme = readmeString;
-                    else
-                        Console.WriteLine(readmeString);
+                    parameters.Progress.Readme = readmeString;
 
                     try
                     {
@@ -387,11 +352,7 @@ public static class ZipFileHelper
                         throw new InvalidOperationException("Failed to write readme.txt to zip archive.", e);
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress.AddInfo("Adding setup.json file to zip archive.");
-                    else
-                        Console.WriteLine("Adding setup.json file to zip archive.");
-
+                    parameters.Progress.AddInfo("Adding setup.json file to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     try
