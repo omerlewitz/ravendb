@@ -1,14 +1,13 @@
 ﻿using System;
 using System.IO;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
 using Sparrow.Platform;
+using JsonSerializer = Newtonsoft.Json.JsonSerializer;
 using Raven.Server.Commercial;
 using Raven.Server.Commercial.LetsEncrypt;
-using Raven.Server.Utils;
-using JsonSerializer = Newtonsoft.Json.JsonSerializer;
+using Voron.Global;
 
 namespace rvn
 {
@@ -24,7 +23,6 @@ namespace rvn
 
         private const string LetsEncryptMode = "lets-encrypt";
         private const string ImportCertificateMode = "import-certificate";
-        private const string LetsEncryptSetupParam = "setup-params";
         
         public static int Run(string[] args)
         {
@@ -112,14 +110,18 @@ namespace rvn
             
             using (StreamReader file = File.OpenText(setupParamsPath ?? string.Empty))
             {
-                SetupProgressAndResult setupProgressAndResult = new();
+                var progress = new SetupProgressAndResult(null)
+                {
+                    Processed = 0,
+                    Total = 2
+                };
                 JsonSerializer serializer = new();
                 
                 var setupInfo = (SetupInfo)serializer.Deserialize(file, typeof(SetupInfo));
                 if (setupInfo != null)
                 {
                     if (packageOutParam == null)
-                        packageOutParam = setupInfo?.Domain + "-package.zip";
+                        packageOutParam = setupInfo.Domain + "-package.zip";
                     else
                         packageOutParam += "-package.zip";
 
@@ -131,18 +133,18 @@ namespace rvn
                         
                         setupInfo.Certificate =  certBase64;
                         setupInfo.Password = certPass;
-                        zipFile = await LetsEncryptByTools.SetupOwnCertByRvn(setupInfo, setupParamsPath, setupProgressAndResult, token);
+                        zipFile = await LetsEncryptByTools.SetupOwnCertByRvn(setupInfo, setupParamsPath, progress, token);
 
                     }
                     else
                     {
-                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, setupProgressAndResult, token);
+                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, token);
                     }
                 }
                 var path = Path.Combine(AppContext.BaseDirectory, packageOutParam);
                 await File.WriteAllBytesAsync(path, zipFile, token);
                 
-                setupProgressAndResult.AddInfo($"ZIP file was successfully added to this location: {path}");
+                progress.AddInfo($"ZIP file was successfully added to this location: {path}");
             }
 
             return 0;
@@ -502,7 +504,7 @@ namespace rvn
 
             if (directory.Name.Equals("System"))
             {
-                if (File.Exists(Path.Combine(directory.FullName, Voron.Global.Constants.DatabaseFilename)) == false)
+                if (File.Exists(Path.Combine(directory.FullName, Constants.DatabaseFilename)) == false)
                     throw new InvalidOperationException("Please provide a valid System directory.");
             }
             else

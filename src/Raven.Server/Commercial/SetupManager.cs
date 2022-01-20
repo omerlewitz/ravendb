@@ -50,7 +50,11 @@ namespace Raven.Server.Commercial
         public static async Task<IOperationResult> SetupSecuredTask(Action<IOperationProgress> onProgress, SetupInfo setupInfo, ServerStore serverStore,
             CancellationToken token)
         {
-            var progress = new SetupProgressAndResult {Processed = 0, Total = 2};
+            var progress = new SetupProgressAndResult(Logger)
+            {
+                Processed = 0,
+                Total = 2
+            };
 
             try
             {
@@ -155,7 +159,11 @@ namespace Raven.Server.Commercial
         public static async Task<IOperationResult> ContinueClusterSetupTask(Action<IOperationProgress> onProgress, ContinueSetupInfo continueSetupInfo,
             ServerStore serverStore, CancellationToken token)
         {
-            var progress = new SetupProgressAndResult {Processed = 0, Total = 4};
+            var progress = new SetupProgressAndResult(Logger)
+            {
+                Processed = 0,
+                Total = 4
+            };
 
             try
             {
@@ -453,7 +461,7 @@ namespace Raven.Server.Commercial
     public static async Task<IOperationResult> SetupLetsEncryptTask(Action<IOperationProgress> onProgress, SetupInfo setupInfo, ServerStore serverStore,
         CancellationToken token)
     {
-        var progress = new SetupProgressAndResult
+        var progress = new SetupProgressAndResult(Logger)
         {
             Processed = 0,
             Total = 4

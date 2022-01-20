@@ -53,7 +53,6 @@ namespace Raven.Server.Commercial.LetsEncrypt
                 {
                     setupProgressAndResult.AddInfo("Let's Encrypt challenge(s) completed successfully.");
                     setupProgressAndResult.AddInfo("Acquiring certificate.");
-                    //TODO: do we want to add onProgress ?
                 },
                 SetupInfo = setupInfo,
                 Client = acmeClient,
