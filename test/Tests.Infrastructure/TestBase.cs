@@ -301,7 +301,7 @@ namespace FastTests
                 return clientCertificatePath;
             }
         }
-
+        
         protected string GetTempFileName()
         {
             var tmp = Path.GetTempFileName();
@@ -359,6 +359,7 @@ namespace FastTests
                 {
                     if (_globalServer.Disposed)
                         throw new ObjectDisposedException("Someone disposed the global server!");
+                    
                     _localServer = _globalServer;
 
                     return _localServer;

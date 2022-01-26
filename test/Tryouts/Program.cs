@@ -7,6 +7,7 @@ using SlowTests.Issues;
 using SlowTests.MailingList;
 using SlowTests.Rolling;
 using SlowTests.Server.Documents.ETL.Raven;
+using SlowTests.Tools;
 using StressTests.Issues;
 using Tests.Infrastructure;
 
@@ -21,16 +22,12 @@ namespace Tryouts
 
         public static async Task Main(string[] args)
         {
-            Console.WriteLine(Process.GetCurrentProcess().Id);
-            for (int i = 0; i < 10_000; i++)
-            {
-                 Console.WriteLine($"Starting to run {i}");
                 try
                 {
                     using (var testOutputHelper = new ConsoleTestOutputHelper())
-                    using (var test = new RollingIndexesClusterTests(testOutputHelper))
+                    using (var test = new SetupSecuredClusterUsingRvn(testOutputHelper))
                     {
-                         await test.RemoveNodeFromDatabaseGroupWhileRollingDeployment();
+                         await test.Should_Create_Secured_Cluster_From_Rvn_Using_Lets_Encrypt_Mode();
                     }
                 }
                 catch (Exception e)
@@ -39,7 +36,6 @@ namespace Tryouts
                     Console.WriteLine(e);
                     Console.ForegroundColor = ConsoleColor.White;
                 }
-            }
         }
     }
 }

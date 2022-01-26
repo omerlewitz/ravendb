@@ -250,119 +250,7 @@ namespace Raven.Server.Commercial
             return progress;
         }
 
-        public static BlittableJsonReaderObject ExtractCertificatesAndSettingsJsonFromZip(byte[] zipBytes, string currentNodeTag, JsonOperationContext context,
-            out byte[] certBytes, out X509Certificate2 serverCert, out X509Certificate2 clientCert, out string firstNodeTag,
-            out Dictionary<string, string> otherNodesUrls, out License license)
-        {
-            certBytes = null;
-            byte[] clientCertBytes = null;
-            BlittableJsonReaderObject currentNodeSettingsJson = null;
-            license = null;
 
-            otherNodesUrls = new Dictionary<string, string>();
-
-            firstNodeTag = "A";
-
-            using (var msZip = new MemoryStream(zipBytes))
-            using (var archive = new ZipArchive(msZip, ZipArchiveMode.Read, false))
-            {
-                foreach (var entry in archive.Entries)
-                {
-                    // try to find setup.json file first, as we make decisions based on its contents
-                    if (entry.Name.Equals("setup.json"))
-                    {
-                        var json = context.Sync.ReadForMemory(entry.Open(), "license/json");
-
-                        SetupSettings setupSettings = JsonDeserializationServer.SetupSettings(json);
-                        firstNodeTag = setupSettings.Nodes[0].Tag;
-
-                        // Since we allow to customize node tags, we stored information about the order of nodes into setup.json file
-                        // The first node is the one in which the cluster should be initialized.
-                        // If the file isn't found, it means we are using a zip which was created in the old codebase => first node has the tag 'A'
-                    }
-                }
-
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.FullName.StartsWith($"{currentNodeTag}/") && entry.Name.EndsWith(".pfx"))
-                    {
-                        using (var ms = new MemoryStream())
-                        {
-                            entry.Open().CopyTo(ms);
-                            certBytes = ms.ToArray();
-                        }
-                    }
-
-                    if (entry.Name.StartsWith("admin.client.certificate") && entry.Name.EndsWith(".pfx"))
-                    {
-                        using (var ms = new MemoryStream())
-                        {
-                            entry.Open().CopyTo(ms);
-                            clientCertBytes = ms.ToArray();
-                        }
-                    }
-
-                    if (entry.Name.Equals("license.json"))
-                    {
-                        var json = context.Sync.ReadForMemory(entry.Open(), "license/json");
-                        license = JsonDeserializationServer.License(json);
-                    }
-
-                    if (entry.Name.Equals("settings.json"))
-                    {
-                        using (var settingsJson = context.Sync.ReadForMemory(entry.Open(), "settings-json-from-zip"))
-                        {
-                            settingsJson.TryGet(RavenConfiguration.GetKey(x => x.Core.PublicServerUrl), out string publicServerUrl);
-
-                            if (entry.FullName.StartsWith($"{currentNodeTag}/"))
-                            {
-                                currentNodeSettingsJson = settingsJson.Clone(context);
-                            }
-
-                            // This is for the case where we take the zip file and use it to setup the first node as well.
-                            // If this is the first node, we must collect the urls of the other nodes so that
-                            // we will be able to add them to the cluster when we bootstrap the cluster.
-                            if (entry.FullName.StartsWith(firstNodeTag + "/") == false && publicServerUrl != null)
-                            {
-                                var tag = entry.FullName.Substring(0, entry.FullName.Length - "/settings.json".Length);
-                                otherNodesUrls.Add(tag, publicServerUrl);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (certBytes == null)
-                throw new InvalidOperationException($"Could not extract the server certificate of node '{currentNodeTag}'. Are you using the correct zip file?");
-            if (clientCertBytes == null)
-                throw new InvalidOperationException("Could not extract the client certificate. Are you using the correct zip file?");
-            if (currentNodeSettingsJson == null)
-                throw new InvalidOperationException($"Could not extract settings.json of node '{currentNodeTag}'. Are you using the correct zip file?");
-
-            try
-            {
-                currentNodeSettingsJson.TryGet(RavenConfiguration.GetKey(x => x.Security.CertificatePassword), out string certPassword);
-
-                serverCert = new X509Certificate2(certBytes, certPassword,
-                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
-            }
-            catch (Exception e)
-            {
-                throw new InvalidOperationException($"Unable to load the server certificate of node '{currentNodeTag}'.", e);
-            }
-
-            try
-            {
-                clientCert = new X509Certificate2(clientCertBytes, (string)null,
-                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
-            }
-            catch (Exception e)
-            {
-                throw new InvalidOperationException("Unable to load the client certificate.", e);
-            }
-
-            return currentNodeSettingsJson;
-        }
 
         public static async Task<LicenseStatus> GetUpdatedLicenseStatus(ServerStore serverStore, License currentLicense, Reference<License> updatedLicense = null)
         {
@@ -895,6 +783,117 @@ namespace Raven.Server.Commercial
 
             await serverStore.Cluster.WaitForIndexNotification(res.Index);
         }
+            public static BlittableJsonReaderObject ExtractCertificatesAndSettingsJsonFromZip(byte[] zipBytes, string currentNodeTag, JsonOperationContext context,
+            out byte[] certBytes, out X509Certificate2 serverCert, out X509Certificate2 clientCert, out string firstNodeTag,
+            out Dictionary<string, string> otherNodesUrls, out License license)
+        {
+            certBytes = null;
+            byte[] clientCertBytes = null;
+            BlittableJsonReaderObject currentNodeSettingsJson = null;
+            license = null;
+            otherNodesUrls = new Dictionary<string, string>();
 
+            firstNodeTag = "A";
+
+            using (var msZip = new MemoryStream(zipBytes))
+            using (var archive = new ZipArchive(msZip, ZipArchiveMode.Read, false))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    // try to find setup.json file first, as we make decisions based on its contents
+                    if (entry.Name.Equals("setup.json"))
+                    {
+                        var json = context.Sync.ReadForMemory(entry.Open(), "license/json");
+
+                        SetupSettings setupSettings = JsonDeserializationServer.SetupSettings(json);
+                        firstNodeTag = setupSettings.Nodes[0].Tag;
+
+                        // Since we allow to customize node tags, we stored information about the order of nodes into setup.json file
+                        // The first node is the one in which the cluster should be initialized.
+                        // If the file isn't found, it means we are using a zip which was created in the old codebase => first node has the tag 'A'
+                    }
+                }
+
+                foreach (var entry in archive.Entries)
+                {
+                    if (entry.FullName.StartsWith($"{currentNodeTag}/") && entry.Name.EndsWith(".pfx"))
+                    {
+                        using (var ms = new MemoryStream())
+                        {
+                            entry.Open().CopyTo(ms);
+                            certBytes = ms.ToArray();
+                        }
+                    }
+
+                    if (entry.Name.StartsWith("admin.client.certificate") && entry.Name.EndsWith(".pfx"))
+                    {
+                        using (var ms = new MemoryStream())
+                        {
+                            entry.Open().CopyTo(ms);
+                            clientCertBytes = ms.ToArray();
+                        }
+                    }
+
+                    if (entry.Name.Equals("license.json"))
+                    {
+                        var json = context.Sync.ReadForMemory(entry.Open(), "license/json");
+                        license = JsonDeserializationServer.License(json);
+                    }
+
+                    if (entry.Name.Equals("settings.json"))
+                    {
+                        using (var settingsJson = context.Sync.ReadForMemory(entry.Open(), "settings-json-from-zip"))
+                        {
+                            settingsJson.TryGet(RavenConfiguration.GetKey(x => x.Core.PublicServerUrl), out string publicServerUrl);
+
+                            if (entry.FullName.StartsWith($"{currentNodeTag}/"))
+                            {
+                                currentNodeSettingsJson = settingsJson.Clone(context);
+                            }
+
+                            // This is for the case where we take the zip file and use it to setup the first node as well.
+                            // If this is the first node, we must collect the urls of the other nodes so that
+                            // we will be able to add them to the cluster when we bootstrap the cluster.
+                            if (entry.FullName.StartsWith(firstNodeTag + "/") == false && publicServerUrl != null)
+                            {
+                                var tag = entry.FullName.Substring(0, entry.FullName.Length - "/settings.json".Length);
+                                otherNodesUrls.Add(tag, publicServerUrl);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (certBytes == null)
+                throw new InvalidOperationException($"Could not extract the server certificate of node '{currentNodeTag}'. Are you using the correct zip file?");
+            if (clientCertBytes == null)
+                throw new InvalidOperationException("Could not extract the client certificate. Are you using the correct zip file?");
+            if (currentNodeSettingsJson == null)
+                throw new InvalidOperationException($"Could not extract settings.json of node '{currentNodeTag}'. Are you using the correct zip file?");
+
+            try
+            {
+                currentNodeSettingsJson.TryGet(RavenConfiguration.GetKey(x => x.Security.CertificatePassword), out string certPassword);
+
+                serverCert = new X509Certificate2(certBytes, certPassword,
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException($"Unable to load the server certificate of node '{currentNodeTag}'.", e);
+            }
+
+            try
+            {
+                clientCert = new X509Certificate2(clientCertBytes, (string)null,
+                    X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("Unable to load the client certificate.", e);
+            }
+
+            return currentNodeSettingsJson;
+        }
     }
 }

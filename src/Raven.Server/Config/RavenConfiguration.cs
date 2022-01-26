@@ -22,7 +22,6 @@ using Raven.Server.Commercial;
 using Raven.Server.Config.Attributes;
 using Raven.Server.Config.Categories;
 using Raven.Server.Config.Settings;
-using Raven.Server.Extensions;
 using Raven.Server.ServerWide;
 using Raven.Server.Utils;
 using Sparrow.Logging;
@@ -46,6 +45,8 @@ namespace Raven.Server.Config
 
         public CoreConfiguration Core { get; }
 
+        public SecurityConfiguration Security { get; }
+
 #if !RVN
         public HttpConfiguration Http { get; }
 
@@ -57,7 +58,6 @@ namespace Raven.Server.Config
 
         public StorageConfiguration Storage { get; }
 
-        public SecurityConfiguration Security { get; }
 
         public BackupConfiguration Backup { get; }
 

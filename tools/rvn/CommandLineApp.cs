@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using Raven.Server.Commercial;
 using Sparrow.Platform;
 using JsonSerializer = Newtonsoft.Json.JsonSerializer;
-using Raven.Server.Commercial;
 using Raven.Server.Commercial.LetsEncrypt;
 using Voron.Global;
 
@@ -63,11 +63,10 @@ namespace rvn
 
         private static void ConfigureSetupPackage()
         {
-          
-            
             _app.Command("create-setup-package", cmd =>
             {
-                cmd.ExtendedHelpText = cmd.Description = "Creates RavenDB setup given --mode and --setup-params.json";
+                cmd.ExtendedHelpText = cmd.Description = "Creates RavenDB setup zip file given --mode and --setup-params.json";
+                
                 cmd.HelpOption(HelpOptionString);
                 
                 var mode = ConfigureModeOption(cmd);
@@ -138,7 +137,7 @@ namespace rvn
                     }
                     else
                     {
-                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, token);
+                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, null ,token);
                     }
                 }
                 var path = Path.Combine(AppContext.BaseDirectory, packageOutParam);
@@ -446,7 +445,7 @@ namespace rvn
         
         private static CommandOption ConfigureModeOption(CommandLineApplication cmd)
         {
-            return cmd.Option("--mode", "Option to choose setup from either lets encrypt or importing certificate", CommandOptionType.SingleValue);
+            return cmd.Option("-m|--mode", "Option to choose setup from either lets encrypt or importing certificate", CommandOptionType.SingleValue);
         }
         
         private static CommandOption ConfigureSetupParameters(CommandLineApplication cmd)

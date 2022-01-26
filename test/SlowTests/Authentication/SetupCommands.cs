@@ -21,7 +21,7 @@ namespace SlowTests.Authentication
 {
     public partial class AuthenticationLetsEncryptTests
     {
-        private class ClaimDomainCommand : RavenCommand<ClaimDomainResult>
+        internal class ClaimDomainCommand : RavenCommand<ClaimDomainResult>
         {
             private readonly BlittableJsonReaderObject _payload;
 

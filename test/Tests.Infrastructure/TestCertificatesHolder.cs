@@ -25,7 +25,7 @@ namespace FastTests
 
         private string _clientCertificate3Path;
 
-        public readonly Lazy<TrackingX509Certificate2> ServerCertificate;
+        public Lazy<TrackingX509Certificate2> ServerCertificate;
 
         public readonly Lazy<TrackingX509Certificate2> ClientCertificate1;
 

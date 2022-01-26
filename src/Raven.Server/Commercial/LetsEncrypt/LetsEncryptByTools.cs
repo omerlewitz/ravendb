@@ -1,16 +1,19 @@
 ﻿using System;
-using System.Net.Mail;
+using System.IO;
+using System.Net.Http;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Raven.Client.Documents.Operations;
+using Newtonsoft.Json;
 
 namespace Raven.Server.Commercial.LetsEncrypt
 {
     public static class LetsEncryptByTools
     {
         private const string AcmeClientUrl = "https://acme-v02.api.letsencrypt.org/directory";
+        private static readonly string[] DnsBridgeActions = {"user-domains","domain-availability","claim"};
 
-        public static async Task<byte[]> SetupLetsEncryptByRvn(SetupInfo setupInfo, string settingsPath, SetupProgressAndResult setupProgressAndResult, CancellationToken token)
+        public static async Task<byte[]> SetupLetsEncryptByRvn(SetupInfo setupInfo, string settingsPath, SetupProgressAndResult setupProgressAndResult, string dataFolder, CancellationToken token)
         {
             setupProgressAndResult.AddInfo("Setting up RavenDB in Let's Encrypt security mode.");
 
@@ -22,13 +25,45 @@ namespace Raven.Server.Commercial.LetsEncrypt
             await acmeClient.Init(setupInfo.Email, token);
             setupProgressAndResult.AddInfo($"Getting challenge(s) from Let's Encrypt. Using e-mail: {setupInfo.Email}.");
 
-            var challengeResult = await InitialLetsEncryptChallenge(setupInfo, acmeClient, token);
-            setupProgressAndResult.AddInfo(challengeResult.Challenge != null
-                ? "Successfully received challenge(s) information from Let's Encrypt."
-                : "Using cached Let's Encrypt certificate.");
+            (string Challenge, LetsEncryptClient.CachedCertificateResult Cache) challengeResult;
+            try
+            {
+                challengeResult = await InitialLetsEncryptChallenge(setupInfo, acmeClient, token);
+                setupProgressAndResult.AddInfo(challengeResult.Challenge != null
+                    ? "Successfully received challenge(s) information from Let's Encrypt."
+                    : "Using cached Let's Encrypt certificate.");
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("Failed to initialize lets encrypt challenge: " + e);
+
+            }
 
             try
             {
+                var registrationInfo = new RegistrationInfo
+                {
+                    License = setupInfo.License,
+                    Domain = setupInfo.Domain,
+                    Challenge = challengeResult.Challenge,
+                    RootDomain = setupInfo.RootDomain,
+                };
+                var serializeObject = JsonConvert.SerializeObject(registrationInfo);
+
+                foreach (var action in DnsBridgeActions)
+                {
+                    try
+                    {
+                        var content = new StringContent(serializeObject, Encoding.UTF8, "application/json");
+                        var response = await ApiHttpClient.Instance.PostAsync($"/api/v1/dns-n-cert/{action}", content, CancellationToken.None).ConfigureAwait(false);
+                        response.EnsureSuccessStatusCode();
+                    }
+                    catch (Exception e)
+                    {
+                        throw new InvalidOperationException($"Failed to perform the given action: {action}", e);
+                    }
+                }            
+           
                 await RavenDnsRecordHelper.UpdateDnsRecordsTask(new RavenDnsRecordHelper.UpdateDnsRecordParameters
                 {
                     Challenge = challengeResult.Challenge,
@@ -57,7 +92,7 @@ namespace Raven.Server.Commercial.LetsEncrypt
                 SetupInfo = setupInfo,
                 Client = acmeClient,
                 ChallengeResult = challengeResult,
-                Token = CancellationToken.None
+                Token = CancellationToken.None,
             });
 
             setupProgressAndResult.AddInfo("Successfully acquired certificate from Let's Encrypt.");
@@ -72,11 +107,11 @@ namespace Raven.Server.Commercial.LetsEncrypt
                     SetupInfo = setupInfo,
                     SetupMode = SetupMode.None,
                     SettingsPath = settingsPath,
+                    OnGetCertificatePath = (getCertificatePath) => Task.Run(() =>Path.Combine(dataFolder,getCertificatePath), token),
                     LicenseType = LicenseType.None,
                     Token = CancellationToken.None,
                 });
-
-
+                
                 return zipFile;
             }
             catch (Exception e)
@@ -108,6 +143,7 @@ namespace Raven.Server.Commercial.LetsEncrypt
                         SettingsPath = settingsPath,
                         LicenseType = LicenseType.None,
                         Token = CancellationToken.None,
+                        CertificateValidationKeyUsages = true
                     });
 
                 }

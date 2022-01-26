@@ -81,6 +81,7 @@ namespace Raven.Server.ServerWide
                         var err = Marshal.GetLastWin32Error();
                         Syscall.ThrowLastError(err, $"when opening {filepath}");
                     }
+
                     try
                     {
                         var ret = Syscall.flock(fd, Syscall.FLockOperations.LOCK_EX);
@@ -110,12 +111,15 @@ namespace Raven.Server.ServerWide
                                     var err = Marshal.GetLastWin32Error();
                                     Syscall.ThrowLastError(err, $"failed to read {filepath}");
                                 }
+
                                 if (read == 0)
                                     break;
                                 amountRead += read;
                             }
+
                             if (amountRead != buffer.Length)
-                                throw new FileLoadException($"Failed to read the full key size from {filepath}, expected to read {buffer.Length} but go only {amountRead}");
+                                throw new FileLoadException(
+                                    $"Failed to read the full key size from {filepath}, expected to read {buffer.Length} but go only {amountRead}");
                         }
                         else // we assume that if the size isn't a key size, then it was never valid and regenerate the key
                         {
@@ -163,6 +167,7 @@ namespace Raven.Server.ServerWide
                             Syscall.ThrowLastError(err, $"Failed to close the secret key file : {filepath}");
                         }
                     }
+
                     return buffer;
                 }
             }
@@ -212,7 +217,7 @@ namespace Raven.Server.ServerWide
         private static byte[] EncryptProtectedData(byte[] secret, byte[] key)
         {
             var protectedData = new byte[secret.Length + (int)Sodium.crypto_aead_xchacha20poly1305_ietf_abytes()
-                 + (int)Sodium.crypto_aead_xchacha20poly1305_ietf_npubbytes()];
+                                                       + (int)Sodium.crypto_aead_xchacha20poly1305_ietf_npubbytes()];
 
             fixed (byte* pContext = EncryptionContext)
             fixed (byte* pSecret = secret)
@@ -326,10 +331,10 @@ namespace Raven.Server.ServerWide
             return unprotectedData;
         }
 
-#if !RVN
-        public static  CertificateUtils.CertificateHolder ValidateCertificateAndCreateCertificateHolder(string source, X509Certificate2 loadedCertificate, byte[] rawBytes, string password, LicenseType licenseType, bool certificateValidationKeyUsages)
+        public static CertificateUtils.CertificateHolder ValidateCertificateAndCreateCertificateHolder(string source, X509Certificate2 loadedCertificate, byte[] rawBytes,
+            string password, LicenseType licenseType, bool certificateValidationKeyUsages)
         {
-            ValidateExpiration(source, loadedCertificate,licenseType);
+            ValidateExpiration(source, loadedCertificate, licenseType);
 
             ValidatePrivateKey(source, password, rawBytes, out var privateKey);
 
@@ -345,7 +350,11 @@ namespace Raven.Server.ServerWide
             };
         }
 
-        public CertificateUtils.CertificateHolder LoadCertificateWithExecutable(string executable, string args, LicenseType licenseType, bool certificateValidationKeyUsages)
+#if !RVN
+
+
+        public CertificateUtils.CertificateHolder LoadCertificateWithExecutable(string executable, string args, LicenseType licenseType,
+            bool certificateValidationKeyUsages)
         {
             Process process;
 
@@ -389,8 +398,10 @@ namespace Raven.Server.ServerWide
             if (process.WaitForExit((int)_config.CertificateExecTimeout.AsTimeSpan.TotalMilliseconds) == false)
             {
                 process.Kill();
-                throw new InvalidOperationException($"Unable to get certificate by executing {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
+                throw new InvalidOperationException(
+                    $"Unable to get certificate by executing {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
             }
+
             try
             {
                 readStdOut.Wait(_config.CertificateExecTimeout.AsTimeSpan);
@@ -486,7 +497,8 @@ namespace Raven.Server.ServerWide
             if (process.WaitForExit((int)_config.CertificateExecTimeout.AsTimeSpan.TotalMilliseconds) == false)
             {
                 process.Kill();
-                throw new InvalidOperationException($"Unable to execute {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
+                throw new InvalidOperationException(
+                    $"Unable to execute {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
             }
 
             try
@@ -495,7 +507,8 @@ namespace Raven.Server.ServerWide
             }
             catch (Exception e)
             {
-                throw new InvalidOperationException($"Unable to execute {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}", e);
+                throw new InvalidOperationException(
+                    $"Unable to execute {executable} {args}, waited for {_config.CertificateExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}", e);
             }
 
             if (Logger.IsOperationsEnabled)
@@ -537,7 +550,8 @@ namespace Raven.Server.ServerWide
             }
             catch (Exception e)
             {
-                throw new InvalidOperationException($"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}. Failed to start process.", e);
+                throw new InvalidOperationException(
+                    $"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}. Failed to start process.", e);
             }
 
             var ms = new MemoryStream();
@@ -560,8 +574,10 @@ namespace Raven.Server.ServerWide
             {
                 process.Kill();
 
-                throw new InvalidOperationException($"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}, waited for {_config.MasterKeyExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
+                throw new InvalidOperationException(
+                    $"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}, waited for {_config.MasterKeyExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}");
             }
+
             try
             {
                 readStdOut.Wait(_config.MasterKeyExecTimeout.AsTimeSpan);
@@ -569,7 +585,9 @@ namespace Raven.Server.ServerWide
             }
             catch (Exception e)
             {
-                throw new InvalidOperationException($"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}, waited for {_config.MasterKeyExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}", e);
+                throw new InvalidOperationException(
+                    $"Unable to get master key by executing {_config.MasterKeyExec} {_config.MasterKeyExecArguments}, waited for {_config.MasterKeyExecTimeout} ms but the process didn't exit. Stderr: {GetStdError()}",
+                    e);
             }
 
             if (Logger.IsOperationsEnabled)
@@ -596,9 +614,6 @@ namespace Raven.Server.ServerWide
             return rawData;
         }
 
-#if !RVN
-        //in utils
-
         public static void AddCertificateChainToTheUserCertificateAuthorityStoreAndCleanExpiredCerts(X509Certificate2 loadedCertificate, byte[] rawBytes, string password)
         {
             // we have to add all the certs in the pfx file provides to the CA store for the current user
@@ -614,7 +629,7 @@ namespace Raven.Server.ServerWide
 
             var storeName = PlatformDetails.RunningOnMacOsx ? StoreName.My : StoreName.CertificateAuthority;
             using (var userIntermediateStore = new X509Store(storeName, StoreLocation.CurrentUser,
-                System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite))
+                       System.Security.Cryptography.X509Certificates.OpenFlags.ReadWrite))
             {
                 foreach (var cert in collection)
                 {
@@ -662,15 +677,21 @@ namespace Raven.Server.ServerWide
                         {
                             // Access denied?
                             if (Logger.IsInfoEnabled)
-                                Logger.Info($"Tried to clean expired certificates from the OS user intermediate store but got an exception when removing a certificate with subject name '{element.Certificate.SubjectName.Name}' and thumbprint '{element.Certificate.Thumbprint}'.", e);
+                                Logger.Info(
+                                    $"Tried to clean expired certificates from the OS user intermediate store but got an exception when removing a certificate with subject name '{element.Certificate.SubjectName.Name}' and thumbprint '{element.Certificate.Thumbprint}'.",
+                                    e);
                         }
                     }
                 }
             }
         }
 
+#if !RVN
+        //in utils
+
+
         public CertificateUtils.CertificateHolder LoadCertificateFromPath(string path, string password, LicenseType licenseType, bool certificateValidationKeyUsages)
-        
+
         {
             try
             {
@@ -723,6 +744,7 @@ namespace Raven.Server.ServerWide
                     throw new InvalidOperationException(
                         $"The size of the key must be {expectedKeySize * 8} bits, but was {key.Length * 8} bits.");
                 }
+
                 return key;
             }
             catch (Exception e)
@@ -733,13 +755,12 @@ namespace Raven.Server.ServerWide
             }
         }
 
-#if !RVN
-
         private static void ValidateExpiration(string source, X509Certificate2 loadedCertificate, LicenseType licenseType)
         {
             if (loadedCertificate.NotAfter < DateTime.UtcNow)
                 if (Logger.IsOperationsEnabled)
-                    Logger.Operations($"The provided certificate {loadedCertificate.FriendlyName} from {source} is expired! Thumbprint: {loadedCertificate.Thumbprint}, Expired on: {loadedCertificate.NotAfter}");
+                    Logger.Operations(
+                        $"The provided certificate {loadedCertificate.FriendlyName} from {source} is expired! Thumbprint: {loadedCertificate.Thumbprint}, Expired on: {loadedCertificate.NotAfter}");
 
             if (licenseType == LicenseType.Developer)
             {
@@ -822,6 +843,7 @@ namespace Raven.Server.ServerWide
                     if (kue.KeyUsages.HasFlag(X509KeyUsageFlags.DigitalSignature) && kue.KeyUsages.HasFlag(X509KeyUsageFlags.KeyEncipherment))
                         keyUsages = true;
                 }
+
                 if (extension is X509EnhancedKeyUsageExtension ekue) //Enhanced Key Usage extension
                 {
                     foreach (var usage in ekue.EnhancedKeyUsages)
@@ -1200,6 +1222,7 @@ namespace Raven.Server.ServerWide
                         {
                             orig.Remove(k);
                         }
+
                         keys[upper] = alias;
                         orig[alias] = value;
                     }
@@ -1335,7 +1358,5 @@ namespace Raven.Server.ServerWide
                 }
             }
         }
-
-#endif
     }
 }
