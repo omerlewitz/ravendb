@@ -3,9 +3,9 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using Raven.Server.Commercial;
 using Sparrow.Platform;
 using JsonSerializer = Newtonsoft.Json.JsonSerializer;
-using Raven.Server.Commercial;
 using Raven.Server.Commercial.LetsEncrypt;
 using Voron.Global;
 
@@ -63,11 +63,10 @@ namespace rvn
 
         private static void ConfigureSetupPackage()
         {
-          
-            
             _app.Command("create-setup-package", cmd =>
             {
-                cmd.ExtendedHelpText = cmd.Description = "Creates RavenDB setup given --mode and --setup-params.json";
+                cmd.ExtendedHelpText = cmd.Description = "Creates RavenDB setup zip file given --mode and --setup-params.json";
+                
                 cmd.HelpOption(HelpOptionString);
                 
                 var mode = ConfigureModeOption(cmd);
@@ -90,7 +89,7 @@ namespace rvn
                                 ExitWithError("--path option must be set",cmd);
                                 break;
                             case ImportCertificateMode:
-                                return await SetupPackageConfiguratorLetsEncrypt(setupParamVal, packageOutParamVal, cmd, ImportCertificateMode, pathToCertVal ,certPassVal, token);
+                                return await SetupPackageConfiguratorLetsEncrypt(setupParamVal, packageOutParamVal, cmd, ImportCertificateMode, pathToCertVal, certPassVal, token);
                             case LetsEncryptMode when string.IsNullOrEmpty(setupParamVal) == false:
                                 return await SetupPackageConfiguratorLetsEncrypt(setupParamVal, packageOutParamVal, cmd, LetsEncryptMode, pathToCertVal, certPassVal, token);
                             default:
@@ -104,7 +103,7 @@ namespace rvn
             });
         }
 
-        private static async Task<int> SetupPackageConfiguratorLetsEncrypt(string setupParamsPath, string packageOutParam, CommandLineApplication cmd,string mode, string certPath, string certPass , CancellationToken token)
+        private static async Task<int> SetupPackageConfiguratorLetsEncrypt(string setupParamsPath, string packageOutParam, CommandLineApplication cmd, string mode, string certPath, string certPass, CancellationToken token)
         {
             var zipFile = Array.Empty<byte>();
             
@@ -115,9 +114,10 @@ namespace rvn
                     Processed = 0,
                     Total = 2
                 };
-                JsonSerializer serializer = new();
                 
+                JsonSerializer serializer = new();
                 var setupInfo = (SetupInfo)serializer.Deserialize(file, typeof(SetupInfo));
+                
                 if (setupInfo != null)
                 {
                     if (packageOutParam == null)
@@ -127,18 +127,16 @@ namespace rvn
 
                     if (mode is ImportCertificateMode)
                     {
-                    
                         var certBytes = await File.ReadAllBytesAsync(certPath, token);
                         var certBase64 = Convert.ToBase64String(certBytes);
                         
                         setupInfo.Certificate =  certBase64;
                         setupInfo.Password = certPass;
                         zipFile = await LetsEncryptByTools.SetupOwnCertByRvn(setupInfo, setupParamsPath, progress, token);
-
                     }
                     else
                     {
-                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, token);
+                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, string.Empty ,token);
                     }
                 }
                 var path = Path.Combine(AppContext.BaseDirectory, packageOutParam);
@@ -446,7 +444,7 @@ namespace rvn
         
         private static CommandOption ConfigureModeOption(CommandLineApplication cmd)
         {
-            return cmd.Option("--mode", "Option to choose setup from either lets encrypt or importing certificate", CommandOptionType.SingleValue);
+            return cmd.Option("-m|--mode", "Option to choose setup from either lets encrypt or importing certificate", CommandOptionType.SingleValue);
         }
         
         private static CommandOption ConfigureSetupParameters(CommandLineApplication cmd)

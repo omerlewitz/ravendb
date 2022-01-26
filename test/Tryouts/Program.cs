@@ -8,6 +8,7 @@ using SlowTests.Issues;
 using SlowTests.MailingList;
 using SlowTests.Rolling;
 using SlowTests.Server.Documents.ETL.Raven;
+using SlowTests.Tools;
 using StressTests.Issues;
 using Tests.Infrastructure;
 
@@ -22,16 +23,15 @@ namespace Tryouts
 
         public static async Task Main(string[] args)
         {
-            Console.WriteLine(Process.GetCurrentProcess().Id);
-            for (int i = 0; i < 10_000; i++)
+            for (int i = 0; i < 100; i++)
             {
-                 Console.WriteLine($"Starting to run {i}");
                 try
                 {
                     using (var testOutputHelper = new ConsoleTestOutputHelper())
-                    using (var test = new TimeSeriesReplicationTests(testOutputHelper))
+                    await using (var test = new SetupSecuredClusterUsingRvn(testOutputHelper))
                     {
-                         await test.PreferDeletedValues3();
+                         await test.Should_Create_Secured_Cluster_From_Rvn_Using_Lets_Encrypt_Mode();
+                         await test.Should_Create_Secured_Cluster_Generating_Self_Singed_Cert_And_Setup_Zip_File_From_Rvn();
                     }
                 }
                 catch (Exception e)
