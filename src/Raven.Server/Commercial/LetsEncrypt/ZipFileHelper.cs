@@ -62,14 +62,7 @@ public static class ZipFileHelper
                 using (var context = new JsonOperationContext(1024, 1024 * 4, 32 * 1024, SharedMultipleUseFlag.None))
                 {
                     parameters.Progress?.AddInfo("Loading and validating server certificate.");
-                    if (parameters.Progress != null)
-                    {
-                        parameters.OnProgress(parameters.Progress);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Loading and validating server certificate.");
-                    }
+                    parameters.OnProgress?.Invoke(parameters.Progress);
 
                     byte[] serverCertBytes;
                     X509Certificate2 serverCert;
@@ -81,8 +74,7 @@ public static class ZipFileHelper
                     {
                         var base64 = parameters.SetupInfo.Certificate;
                         serverCertBytes = Convert.FromBase64String(base64);
-                        serverCert = new X509Certificate2(serverCertBytes, parameters.SetupInfo.Password,
-                            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet);
+                        serverCert = new X509Certificate2(serverCertBytes, parameters.SetupInfo.Password, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.MachineKeySet);
 
                         var localNodeTag = parameters.SetupInfo.LocalNodeTag;
                         publicServerUrl = LetsEncryptCertificateUtil.GetServerUrlFromCertificate(serverCert, parameters.SetupInfo, localNodeTag,
@@ -97,11 +89,7 @@ public static class ZipFileHelper
                             if (node.Key == parameters.SetupInfo.LocalNodeTag)
                                 continue;
 
-                            if (parameters.Progress != null)
-                                parameters.Progress.AddInfo($"Adding node '{node.Key}' to the cluster.");
-                            else
-                                Console.WriteLine($"Adding node '{node.Key}' to the cluster.");
-
+                            parameters.Progress?.AddInfo($"Adding node '{node.Key}' to the cluster.");
                             parameters.OnProgress?.Invoke(parameters.Progress);
 
 
@@ -122,11 +110,7 @@ public static class ZipFileHelper
                         throw new InvalidOperationException("Could not load the certificate in the local server.", e);
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress.AddInfo("Generating the client certificate.");
-                    else
-                        Console.WriteLine($"Generating the client certificate.");
-
+                    parameters.Progress?.AddInfo("Generating the client certificate.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     X509Certificate2 clientCert;
@@ -146,8 +130,7 @@ public static class ZipFileHelper
                         if (parameters.PutCertificate != null)
                             await parameters.PutCertificate(result.CertificateDefinition);
 
-                        clientCert = new X509Certificate2(certBytes, (string)null,
-                            X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
+                        clientCert = new X509Certificate2(certBytes, (string)null, X509KeyStorageFlags.Exportable | X509KeyStorageFlags.PersistKeySet | X509KeyStorageFlags.MachineKeySet);
                     }
                     catch (Exception e)
                     {
@@ -158,11 +141,7 @@ public static class ZipFileHelper
                     if (parameters.RegisterClientCert != null)
                         await parameters.RegisterClientCertInOs(parameters.OnProgress, parameters.Progress, clientCert);
 
-                    if (parameters.Progress != null)
-                        parameters.Progress?.AddInfo("Writing certificates to zip archive.");
-                    else
-                        Console.WriteLine("Writing certificates to zip archive.");
-
+                    parameters.Progress?.AddInfo("Writing certificates to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     try
@@ -171,7 +150,7 @@ public static class ZipFileHelper
 
                         // Structure of external attributes field: https://unix.stackexchange.com/questions/14705/the-zip-formats-external-file-attribute/14727#14727
                         // The permissions go into the most significant 16 bits of an int
-                        entry.ExternalAttributes = ((int)(FilePermissions.S_IRUSR | FilePermissions.S_IWUSR)) << 16;
+                        entry.ExternalAttributes = (int)(FilePermissions.S_IRUSR | FilePermissions.S_IWUSR) << 16;
 
                         await using (var entryStream = entry.Open())
                         {
@@ -212,7 +191,6 @@ public static class ZipFileHelper
                             await using (var writer = new StreamWriter(entryStream))
                             {
                                 await writer.WriteAsync(licenseString);
-                                await writer.FlushAsync();
                             }
                         }
                         catch (Exception e)
@@ -247,13 +225,11 @@ public static class ZipFileHelper
                         {
                             if (parameters.Token != CancellationToken.None)
                             {
-                                await certFile.WriteAsync(serverCertBytes, 0, serverCertBytes.Length, parameters.Token);
-                                await certFile.FlushAsync(parameters.Token);
+                                await certFile.WriteAsync(serverCertBytes, parameters.Token);
                             }
                             else
                             {
-                                await certFile.WriteAsync(serverCertBytes, 0, serverCertBytes.Length, CancellationToken.None);
-                                await certFile.FlushAsync(CancellationToken.None);
+                                await certFile.WriteAsync(serverCertBytes, CancellationToken.None);
                             }
                         } // we'll be flushing the directory when we'll write the settings.json
                     }
@@ -267,23 +243,17 @@ public static class ZipFileHelper
                         var currentNodeSettingsJson = settingsJson.Clone(context);
                         currentNodeSettingsJson.Modifications ??= new DynamicJsonValue(currentNodeSettingsJson);
 
-                        if (parameters.Progress != null)
                             parameters.Progress?.AddInfo($"Creating settings file 'settings.json' for node {node.Key}.");
-                        else
-                            Console.WriteLine($"Creating settings file 'settings.json' for node {node.Key}.");
 
                         parameters.OnProgress?.Invoke(parameters.Progress);
 
                         if (node.Value.Addresses.Count != 0)
                         {
-                            currentNodeSettingsJson.Modifications[RavenConfiguration.GetKey(x => x.Core.ServerUrls)] =
-                                string.Join(";", node.Value.Addresses.Select(ip => IpAddressToUrl(ip, node.Value.Port)));
-                            currentNodeSettingsJson.Modifications[RavenConfiguration.GetKey(x => x.Core.TcpServerUrls)] =
-                                string.Join(";", node.Value.Addresses.Select(ip => IpAddressToTcpUrl(ip, node.Value.TcpPort)));
+                            currentNodeSettingsJson.Modifications[RavenConfiguration.GetKey(x => x.Core.ServerUrls)] = string.Join(";", node.Value.Addresses.Select(ip => IpAddressToUrl(ip, node.Value.Port)));
+                            currentNodeSettingsJson.Modifications[RavenConfiguration.GetKey(x => x.Core.TcpServerUrls)] = string.Join(";", node.Value.Addresses.Select(ip => IpAddressToTcpUrl(ip, node.Value.TcpPort)));
                         }
 
-                        var httpUrl = LetsEncryptCertificateUtil.GetServerUrlFromCertificate(serverCert, parameters.SetupInfo, node.Key, node.Value.Port,
-                            node.Value.TcpPort, out var tcpUrl, out var _);
+                        var httpUrl = LetsEncryptCertificateUtil.GetServerUrlFromCertificate(serverCert, parameters.SetupInfo, node.Key, node.Value.Port, node.Value.TcpPort, out var tcpUrl, out var _);
 
                         if (string.IsNullOrEmpty(node.Value.ExternalIpAddress) == false)
                             currentNodeSettingsJson.Modifications[RavenConfiguration.GetKey(x => x.Core.ExternalIp)] = node.Value.ExternalIpAddress;
@@ -316,11 +286,7 @@ public static class ZipFileHelper
                             }
                         }
 
-                        if (parameters.Progress != null)
-                            parameters.Progress?.AddInfo($"Adding settings file for node '{node.Key}' to zip archive.");
-                        else
-                            Console.WriteLine($"Adding settings file for node '{node.Key}' to zip archive.");
-
+                        parameters.Progress?.AddInfo($"Adding settings file for node '{node.Key}' to zip archive.");
                         parameters.OnProgress?.Invoke(parameters.Progress);
 
                         try
@@ -332,17 +298,16 @@ public static class ZipFileHelper
                             await using (var writer = new StreamWriter(entryStream))
                             {
                                 await writer.WriteAsync(indentedJson);
-                                await writer.FlushAsync();
                             }
 
                             // we save this multiple times on each node, to make it easier
                             // to deploy by just copying the node
                             entry = archive.CreateEntry($"{node.Key}/{certificateFileName}");
-                            entry.ExternalAttributes = ((int)(FilePermissions.S_IRUSR | FilePermissions.S_IWUSR)) << 16;
+                            entry.ExternalAttributes = (int)(FilePermissions.S_IRUSR | FilePermissions.S_IWUSR) << 16;
 
                             await using (var entryStream = entry.Open())
                             {
-                                await entryStream.WriteAsync(serverCertBytes, 0, serverCertBytes.Length);
+                                await entryStream.WriteAsync(serverCertBytes);
                             }
                         }
                         catch (Exception e)
@@ -351,20 +316,16 @@ public static class ZipFileHelper
                         }
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress?.AddInfo("Adding readme file to zip archive.");
-                    else
-                        Console.WriteLine("Adding readme file to zip archive.");
-
+                    parameters.Progress?.AddInfo("Adding readme file to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     string readmeString = CreateReadmeText(parameters.SetupInfo.LocalNodeTag, publicServerUrl, parameters.SetupInfo.NodeSetupInfos.Count > 1,
                         parameters.SetupInfo.RegisterClientCert);
 
                     if (parameters.Progress != null)
+                    {
                         parameters.Progress.Readme = readmeString;
-                    else
-                        Console.WriteLine(readmeString);
+                    }
 
                     try
                     {
@@ -375,11 +336,6 @@ public static class ZipFileHelper
                         await using (var writer = new StreamWriter(entryStream))
                         {
                             await writer.WriteAsync(readmeString);
-                            await writer.FlushAsync();
-                            if (parameters.Token != CancellationToken.None)
-                                await entryStream.FlushAsync(parameters.Token);
-                            else
-                                await entryStream.FlushAsync(CancellationToken.None);
                         }
                     }
                     catch (Exception e)
@@ -387,11 +343,7 @@ public static class ZipFileHelper
                         throw new InvalidOperationException("Failed to write readme.txt to zip archive.", e);
                     }
 
-                    if (parameters.Progress != null)
-                        parameters.Progress.AddInfo("Adding setup.json file to zip archive.");
-                    else
-                        Console.WriteLine("Adding setup.json file to zip archive.");
-
+                    parameters.Progress.AddInfo("Adding setup.json file to zip archive.");
                     parameters.OnProgress?.Invoke(parameters.Progress);
 
                     try
@@ -561,11 +513,9 @@ public static class ZipFileHelper
     public class CompleteAuthorizationAndGetCertificateParameters
     {
         public Action OnValidationSuccessful;
-        //public SetupProgressAndResult Progress;
         public SetupInfo SetupInfo;
         public LetsEncryptClient Client;
         public (string Challange, LetsEncryptClient.CachedCertificateResult Cache) ChallengeResult;
-        //public ServerStore ServerStore;
         public CancellationToken Token;
         public RSA ExistingPrivateKey;
     }
@@ -602,7 +552,7 @@ public static class ZipFileHelper
 
             if (item.Certificate.Thumbprint == certificate.Thumbprint)
             {
-                var key = new AsymmetricKeyEntry(DotNetUtilities.GetKeyPair(certWithKey.PrivateKey).Private);
+                var key = new AsymmetricKeyEntry(DotNetUtilities.GetKeyPair(certWithKey.GetRSAPrivateKey()).Private);
                 store.SetKeyEntry(x509Certificate.SubjectDN.ToString(), key, new[] {new X509CertificateEntry(x509Certificate)});
                 continue;
             }
@@ -636,12 +586,10 @@ public static class ZipFileHelper
         }
 
         parameters.OnValidationSuccessful();
-        //parameters.Progress.AddInfo("Let's encrypt validation successful, acquiring certificate now...");
 
         (X509Certificate2 Cert, RSA PrivateKey) result;
         try
         {
-            //var existingPrivateKey = parameters.ServerStore?.Server.Certificate?.Certificate?.GetRSAPrivateKey();
             result = await parameters.Client.GetCertificate(parameters.ExistingPrivateKey, parameters.Token);
         }
         catch (Exception e)
@@ -658,7 +606,7 @@ public static class ZipFileHelper
             throw new InvalidOperationException("Failed to build certificate from Let's Encrypt.", e);
         }
     }
-    
+
     public static string IpAddressToUrl(string address, int port)
     {
         var url = "https://" + address;
