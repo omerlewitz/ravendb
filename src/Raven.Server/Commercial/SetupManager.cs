@@ -652,6 +652,7 @@ namespace Raven.Server.Commercial
                 Progress = progress,
                 SetupInfo = setupInfo,
                 SettingsPath = serverStore.Configuration.ConfigPath,
+                SetupMode = setupMode,
                 OnWriteSettingsJsonLocally = indentedJson =>
                 {
                     return Task.Run(() => ZipFileHelper.WriteSettingsJsonLocally(serverStore.Configuration.ConfigPath, indentedJson), token);
