@@ -132,11 +132,11 @@ namespace rvn
                         
                         setupInfo.Certificate =  certBase64;
                         setupInfo.Password = certPass;
-                        zipFile = await LetsEncryptByTools.SetupOwnCertByRvn(setupInfo, setupParamsPath, progress, token);
+                        zipFile = await LetsEncryptRvnUtils.ImportCertificateSetup(setupInfo, setupParamsPath, progress, token);
                     }
                     else
                     {
-                        zipFile = await LetsEncryptByTools.SetupLetsEncryptByRvn(setupInfo, setupParamsPath, progress, string.Empty ,token);
+                        zipFile = await LetsEncryptRvnUtils.SetupLetsEncrypt(setupInfo, setupParamsPath, progress, string.Empty ,token);
                     }
                 }
                 var path = Path.Combine(AppContext.BaseDirectory, packageOutParam);
