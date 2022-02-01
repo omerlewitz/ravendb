@@ -326,11 +326,16 @@ namespace Raven.Server.ServerWide
             return unprotectedData;
         }
 
-        private static void ValidateExpiration(string source, X509Certificate2 loadedCertificate, LicenseType licenseType)
+        private static void ValidateExpiration(string source, X509Certificate2 loadedCertificate, LicenseType licenseType, SetupProgressAndResult progress = null)
         {
             if (loadedCertificate.NotAfter < DateTime.UtcNow)
+            {
+                string msg = $"The provided certificate {loadedCertificate.FriendlyName} from {source} is expired! Thumbprint: {loadedCertificate.Thumbprint}, Expired on: {loadedCertificate.NotAfter}";
                 if (Logger.IsOperationsEnabled)
-                    Logger.Operations($"The provided certificate {loadedCertificate.FriendlyName} from {source} is expired! Thumbprint: {loadedCertificate.Thumbprint}, Expired on: {loadedCertificate.NotAfter}");
+                    Logger.Operations(msg);
+                progress?.AddError(msg);
+            }
+                
 
             if (licenseType == LicenseType.Developer)
             {
@@ -344,20 +349,23 @@ namespace Raven.Server.ServerWide
 
                     if (Logger.IsOperationsEnabled)
                         Logger.Operations(msg);
+                    
+                    progress?.AddError(msg);
+                    
                     throw new InvalidOperationException(msg);
                 }
             }
         }
 
-        public static CertificateUtils.CertificateHolder ValidateCertificateAndCreateCertificateHolder(string source, X509Certificate2 loadedCertificate, byte[] rawBytes, string password, LicenseType licenseType, bool certificateValidationKeyUsages)
+        public static CertificateUtils.CertificateHolder ValidateCertificateAndCreateCertificateHolder(string source, X509Certificate2 loadedCertificate, byte[] rawBytes, string password, LicenseType licenseType, bool validateCertKeyUsages, SetupProgressAndResult progress = null)
         {
-            ValidateExpiration(source, loadedCertificate, licenseType);
+            ValidateExpiration(source, loadedCertificate, licenseType, progress);
 
-            ValidatePrivateKey(source, password, rawBytes, out var privateKey);
+            ValidatePrivateKey(source, password, rawBytes, out var privateKey, progress);
 
-            ValidateKeyUsages(source, loadedCertificate, certificateValidationKeyUsages);
+            ValidateKeyUsages(source, loadedCertificate, validateCertKeyUsages, progress);
 
-            AddCertificateChainToTheUserCertificateAuthorityStoreAndCleanExpiredCerts(loadedCertificate, rawBytes, password);
+            AddCertificateChainToTheUserCertificateAuthorityStoreAndCleanExpiredCerts(loadedCertificate, rawBytes, password, progress);
 
             return new CertificateUtils.CertificateHolder
             {
@@ -367,7 +375,7 @@ namespace Raven.Server.ServerWide
             };
         }
 
-        public static void ValidateKeyUsages(string source, X509Certificate2 loadedCertificate, bool validateKeyUsages)
+        public static void ValidateKeyUsages(string source, X509Certificate2 loadedCertificate, bool validateKeyUsages, SetupProgressAndResult progress = null)
         {
             var clientCert = false;
             var serverCert = false;
@@ -419,7 +427,8 @@ namespace Raven.Server.ServerWide
 
             if (Logger.IsOperationsEnabled)
                 Logger.Operations(msg);
-
+            progress?.AddInfo(msg);
+            
             throw new EncryptionException(msg);
         }
 
@@ -676,7 +685,7 @@ namespace Raven.Server.ServerWide
 
             return rawData;
         }
-        public static void AddCertificateChainToTheUserCertificateAuthorityStoreAndCleanExpiredCerts(X509Certificate2 loadedCertificate, byte[] rawBytes, string password)
+        public static void AddCertificateChainToTheUserCertificateAuthorityStoreAndCleanExpiredCerts(X509Certificate2 loadedCertificate, byte[] rawBytes, string password, SetupProgressAndResult progress = null)
         {
             // we have to add all the certs in the pfx file provides to the CA store for the current user
             // to avoid a remote call on any incoming connection by the SslStream infrastructure
@@ -737,16 +746,19 @@ namespace Raven.Server.ServerWide
                         }
                         catch (CryptographicException e)
                         {
+                            var msg = $"Tried to clean expired certificates from the OS user intermediate store but got an exception when removing a certificate with subject name '{element.Certificate.SubjectName.Name}' and thumbprint '{element.Certificate.Thumbprint}'.";
+                           
                             // Access denied?
-                            if (Logger.IsInfoEnabled)
-                                Logger.Info($"Tried to clean expired certificates from the OS user intermediate store but got an exception when removing a certificate with subject name '{element.Certificate.SubjectName.Name}' and thumbprint '{element.Certificate.Thumbprint}'.", e);
+                            if (Logger is {IsInfoEnabled:true})
+                                Logger.Info(msg, e);
+                            progress?.AddError(msg, e);
                         }
                     }
                 }
             }
         }
 
-        internal static void ValidatePrivateKey(string source, string certificatePassword, byte[] rawData, out AsymmetricKeyEntry pk)
+        internal static void ValidatePrivateKey(string source, string certificatePassword, byte[] rawData, out AsymmetricKeyEntry pk, SetupProgressAndResult progress = null)
         {
             pk = null;
             foreach (string alias in GetAliases(certificatePassword, rawData, out var getKey))
@@ -759,8 +771,11 @@ namespace Raven.Server.ServerWide
             if (pk == null)
             {
                 var msg = "Unable to find the private key in the provided certificate from " + source;
+                
                 if (Logger.IsOperationsEnabled)
                     Logger.Operations(msg);
+                progress?.AddInfo(msg);
+                
                 throw new EncryptionException(msg);
             }
 
