@@ -26,6 +26,7 @@ using Raven.Server.Routing;
 using Raven.Server.ServerWide;
 using Raven.Server.ServerWide.Commands;
 using Raven.Server.ServerWide.Context;
+using Raven.Server.Utils;
 using Sparrow.Json;
 using Sparrow.Json.Parsing;
 using StudioConfiguration = Raven.Client.Documents.Operations.Configuration.StudioConfiguration;
@@ -471,7 +472,7 @@ namespace Raven.Server.Web.System
                     writer.WriteStartArray();
 
                     var first = true;
-                    foreach (var value in LetsEncryptCertificateUtil.GetCertificateAlternativeNames(certificate))
+                    foreach (var value in CertificateUtils.GetCertificateAlternativeNames(certificate))
                     {
                         if (first == false)
                             writer.WriteComma();
@@ -554,7 +555,7 @@ namespace Raven.Server.Web.System
 
                 var modifiedJsonObj = context.ReadObject(settingsJson, "modified-settings-json");
 
-                var indentedJson = JsonStringHelper.IndentJsonString(modifiedJsonObj.ToString());
+                var indentedJson = JsonStringHelper.Indent(modifiedJsonObj.ToString());
                 SettingsZipFileHelper.WriteSettingsJsonLocally(ServerStore.Configuration.ConfigPath, indentedJson);
             }
 
