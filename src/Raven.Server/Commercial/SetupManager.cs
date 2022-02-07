@@ -83,8 +83,32 @@ namespace Raven.Server.Commercial
 
                 try
                 {
-                    progress.SettingsZipFile =
-                        await CompleteClusterConfigurationAndGetSettingsZip(onProgress, progress, SetupMode.Secured, setupInfo, serverStore, token);
+                    var completeClusterConfigurationResult = await CompleteClusterConfigurationAndGetSettingsZip(onProgress, progress, SetupMode.Secured, setupInfo, serverStore, token);
+
+                    progress.SettingsZipFile = await SettingsZipFileHelper.GetSetupZipFile(new GetSetupZipFileParameters
+                    {
+                        CompleteClusterConfigurationResult = completeClusterConfigurationResult,
+                        Progress = progress,
+                        OnProgress = onProgress,
+                        OnSettingsPath = () => serverStore.Configuration.ConfigPath,
+                        SetupInfo = setupInfo,
+                        SetupMode = SetupMode.Secured,
+                        Token = token,
+                        OnWriteSettingsJsonLocally = indentedJson => SettingsZipFileHelper.WriteSettingsJsonLocally(serverStore.Configuration.ConfigPath, indentedJson),
+                        OnGetCertificatePath = certificateFileName =>
+                        {
+                            return serverStore.Configuration.GetSetting(RavenConfiguration.GetKey(x => x.Core.SetupResultingServerCertificatePath)) ?? Path.Combine(AppContext.BaseDirectory, certificateFileName);
+                        },
+                        OnPutServerWideStudioConfigurationValues = async studioEnvironment =>
+                        {
+                            var res = await serverStore.PutValueInClusterAsync(new PutServerWideStudioConfigurationCommand(new ServerWideStudioConfiguration
+                            {
+                                Disabled = false,
+                                Environment = studioEnvironment
+                            }, RaftIdGenerator.DontCareId));
+                            await serverStore.Cluster.WaitForIndexNotification(res.Index);
+                        }
+                    });
                 }
                 catch (Exception e)
                 {
@@ -135,7 +159,7 @@ namespace Raven.Server.Commercial
             if (Logger.IsOperationsEnabled)
                 Logger.Operations($"Successfully updated DNS record(s) and challenge(s) in {setupInfo.Domain.ToLower()}.{setupInfo.RootDomain.ToLower()}");
 
-            var cert = await SettingsZipFileHelper.CompleteAuthorizationAndGetCertificate(
+            var cert = await CertificateUtils.CompleteAuthorizationAndGetCertificate(
                 new CompleteAuthorizationAndGetCertificateParameters
                 {
                     OnValidationSuccessful = () =>
@@ -416,7 +440,7 @@ namespace Raven.Server.Commercial
             progress.AddInfo("Completing Let's Encrypt challenge(s)...");
             onProgress(progress);
 
-            await SettingsZipFileHelper.CompleteAuthorizationAndGetCertificate(new CompleteAuthorizationAndGetCertificateParameters
+            await CertificateUtils.CompleteAuthorizationAndGetCertificate(new CompleteAuthorizationAndGetCertificateParameters
             {
                 OnValidationSuccessful = () =>
                 {
@@ -454,7 +478,34 @@ namespace Raven.Server.Commercial
 
             try
             {
-                progress.SettingsZipFile = await CompleteClusterConfigurationAndGetSettingsZip(onProgress, progress, SetupMode.LetsEncrypt, setupInfo, serverStore, token);
+                var completeClusterConfigurationResult = await CompleteClusterConfigurationAndGetSettingsZip(onProgress, progress, SetupMode.LetsEncrypt, setupInfo, serverStore, token);
+
+                progress.SettingsZipFile = await SettingsZipFileHelper.GetSetupZipFile(new GetSetupZipFileParameters
+                {
+                    CompleteClusterConfigurationResult = completeClusterConfigurationResult,
+                    Progress = progress,
+                    OnProgress = onProgress,
+                    OnSettingsPath = () => serverStore.Configuration.ConfigPath,
+                    SetupInfo = setupInfo,
+                    SetupMode = SetupMode.LetsEncrypt,
+                    Token = token,
+                    OnWriteSettingsJsonLocally = indentedJson => SettingsZipFileHelper.WriteSettingsJsonLocally(serverStore.Configuration.ConfigPath, indentedJson),
+                    OnGetCertificatePath = certificateFileName =>
+                    {
+                        return serverStore.Configuration.GetSetting(RavenConfiguration.GetKey(x => x.Core.SetupResultingServerCertificatePath)) ??
+                               Path.Combine(AppContext.BaseDirectory, certificateFileName);
+                    },
+                    OnPutServerWideStudioConfigurationValues = async studioEnvironment =>
+                    {
+                        var res = await serverStore.PutValueInClusterAsync(new PutServerWideStudioConfigurationCommand(new ServerWideStudioConfiguration
+                        {
+                            Disabled = false,
+                            Environment = studioEnvironment
+                        }, RaftIdGenerator.DontCareId));
+                        
+                        await serverStore.Cluster.WaitForIndexNotification(res.Index);
+                    }
+                });
             }
             catch (Exception e)
             {
@@ -651,7 +702,8 @@ namespace Raven.Server.Commercial
                 throw new InvalidOperationException("Failed to create the readme text.", e);
             }
         }
-     private static async Task<byte[]> CompleteClusterConfigurationAndGetSettingsZip(
+
+        private static async Task<CompleteClusterConfigurationResult> CompleteClusterConfigurationAndGetSettingsZip(
             Action<IOperationProgress> onProgress,
             SetupProgressAndResult progress,
             SetupMode setupMode,
@@ -659,22 +711,18 @@ namespace Raven.Server.Commercial
             ServerStore serverStore,
             CancellationToken token)
         {
-            return await SettingsZipFileHelper.CompleteClusterConfigurationAndGetSettingsZip(new CompleteClusterConfigurationParameters
+            return await SetupWizardUtils.CompleteClusterConfiguration(new()
             {
                 OnProgress = onProgress,
                 Progress = progress,
                 SetupInfo = setupInfo,
                 OnSettingsPath = () => serverStore.Configuration.ConfigPath,
                 SetupMode = setupMode,
-                OnWriteSettingsJsonLocally = indentedJson =>
-                {
-                    return Task.Run(() => SettingsZipFileHelper.WriteSettingsJsonLocally(serverStore.Configuration.ConfigPath, indentedJson), token);
-                },
+                OnWriteSettingsJsonLocally = indentedJson => SettingsZipFileHelper.WriteSettingsJsonLocally(serverStore.Configuration.ConfigPath, indentedJson),
                 OnGetCertificatePath = certificateFileName =>
                 {
-                    return Task.Run(() => serverStore.Configuration.GetSetting(
-                                              RavenConfiguration.GetKey(x => x.Core.SetupResultingServerCertificatePath))
-                                          ?? Path.Combine(AppContext.BaseDirectory, certificateFileName), token);
+                    return serverStore.Configuration.GetSetting(RavenConfiguration.GetKey(x => x.Core.SetupResultingServerCertificatePath)) ??
+                           Path.Combine(AppContext.BaseDirectory, certificateFileName);
                 },
                 OnPutServerWideStudioConfigurationValues = async studioEnvironment =>
                 {
@@ -717,10 +765,7 @@ namespace Raven.Server.Commercial
                         throw new InvalidOperationException($"Failed to add node '{nodeTag}' to the cluster.", e);
                     }
                 },
-                RegisterClientCertInOs = (onProgressCopy, progressCopy, clientCert) =>
-                {
-                    return Task.Run(() => RegisterClientCertInOs(onProgressCopy, progressCopy, clientCert), token);
-                },
+                RegisterClientCertInOs = (onProgressCopy, progressCopy, clientCert) => RegisterClientCertInOs(onProgressCopy, progressCopy, clientCert)
             });
         }
 
