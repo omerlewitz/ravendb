@@ -8,6 +8,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Raven.Client;
 using Raven.Client.Documents.Operations;
 using Raven.Client.ServerWide;
 using Raven.Client.ServerWide.Operations.Certificates;
@@ -323,7 +324,7 @@ namespace Raven.Server.Commercial
 
         foreach (var hostnameOrIp in localNode.Addresses)
         {
-            if (hostnameOrIp.Equals(LetsEncryptValidationHelper.AnyIp))
+            if (hostnameOrIp.Equals(Constants.Network.AnyIp))
             {
                 localIps.Add(new IPEndPoint(IPAddress.Parse(hostnameOrIp), localNode.Port));
                 continue;
@@ -557,7 +558,7 @@ namespace Raven.Server.Commercial
                 serverCert,
                 serverCertBytes,
                 certPassword,
-                serverStore.LicenseManager.LicenseStatus.Type,
+                serverStore.GetLicenseType(),
                 true);
 
             if (continueSetupInfo.NodeTag.Equals(firstNodeTag))
