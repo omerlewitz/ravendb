@@ -1,4 +1,5 @@
-﻿using Sparrow.Json;
+﻿using System.Collections.Generic;
+using Sparrow.Json;
 
 namespace Raven.Client.Json
 {
@@ -11,5 +12,9 @@ namespace Raven.Client.Json
     {
         public BlittableJsonReaderArray Results { get; set; }
         public long? TransactionIndex { get; set; }
+    }
+    public class BatchCommandResult2
+    {
+        public List<string> Ids { get; set; }
     }
 }
